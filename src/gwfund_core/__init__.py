@@ -37,7 +37,7 @@
 
 from __future__ import annotations
 
-from . import attribution, chase, fees, identities, metrics, mixing, reconcile, returns
+from . import aggregate, attribution, chase, fees, identities, metrics, mixing, reconcile, returns
 from .attribution import RNetReconciliation, SelfProvisionWarning
 from .errors import (
     AttributionResidualError,
@@ -51,6 +51,7 @@ from .errors import (
     OtherResidualWarning,
     PrecisionLevelViolationError,
 )
+from .aggregate import FundFigure
 from .metrics import DrawdownResult
 from .reconcile import ReconcileReport, ReconcileStep
 from .types import (
@@ -72,6 +73,7 @@ __version__ = "0.4.0"
 __all__ = [
     "__version__",
     # —— 子模块 ——
+    "aggregate",
     "attribution",
     "chase",
     "fees",
@@ -83,6 +85,7 @@ __all__ = [
     # —— 类型 ——
     "DrawdownResult",
     "FeeAccrual",
+    "FundFigure",
     "FeeRate",
     "IdentityCheck",
     "MixingMethod",
