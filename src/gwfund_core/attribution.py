@@ -257,17 +257,17 @@ def waterfall(
             stacklevel=2,
         )
     elif r_net_source == "unknown":
-        # 未声明来源 —— 退回启发式：残差恰为 0 且 rn != 0 视为自证指纹
-        if abs(residual) < Decimal("0.000001") and rn != 0:
-            expected_identity = a0 + ns + rn - dv + ot
-            if abs(expected_identity - at) < Decimal("0.000001"):
-                self_provision = True
-                warnings.warn(
-                    "归因残差恰为 0：R_net 极可能来自 A 式反解，残差门已失效（B02）。"
-                    "生产路径请改用 waterfall_independent() 或先做 reconcile_r_net()。",
-                    SelfProvisionWarning,
-                    stacklevel=2,
-                )
+        # 未声明来源 —— 退回启发式：算术上精确闭合（且 rn != 0）视为自证指纹。
+        # W-03：原先内外两层条件等价（expected_identity 就是 explained），
+        # 合并为一层；并用**未量化**的差值判断，避免 quantize 带来的边界假象。
+        if abs(explained - at) < Decimal("0.000001") and rn != 0:
+            self_provision = True
+            warnings.warn(
+                "归因残差恰为 0：R_net 极可能来自 A 式反解，残差门已失效（B02）。"
+                "生产路径请改用 waterfall_independent() 或先做 reconcile_r_net()。",
+                SelfProvisionWarning,
+                stacklevel=2,
+            )
     # r_net_source in ("return", "disclosure") → 独立路径，跳过自证检测
 
     # ---- 门的最终判定：可信且通过才算通过 -------------------------------

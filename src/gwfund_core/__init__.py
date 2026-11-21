@@ -85,7 +85,7 @@ from .types import (
     WeightScheme,
 )
 
-__version__ = "1.0.0rc2"
+__version__ = "1.0.0"
 
 __all__ = [
     "__version__",
