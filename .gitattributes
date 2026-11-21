@@ -1,0 +1,38 @@
+# 跨平台换行与二进制标记（Gradcoin 接入函 §5）
+# Windows 开发 / GitHub Linux 运行，不配这个 git diff 会满屏 ^M
+* text=auto eol=lf
+
+*.py    text eol=lf
+*.md    text eol=lf
+*.json  text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.toml  text eol=lf
+*.ts    text eol=lf
+*.tsx   text eol=lf
+*.js    text eol=lf
+*.jsx   text eol=lf
+*.css   text eol=lf
+*.html  text eol=lf
+*.sh    text eol=lf
+*.bat   text eol=crlf
+*.ps1   text eol=crlf
+*.cmd   text eol=crlf
+
+# 二进制：不要做换行转换，也不要参与文本 diff
+*.parquet binary
+*.xlsx    binary
+*.xls     binary
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.gif     binary
+*.ico     binary
+*.woff    binary
+*.woff2   binary
+*.pdf     binary
+*.zip     binary
+
+# 生成物：diff 里不显示
+*.lock    -diff linguist-generated
+pnpm-lock.yaml -diff linguist-generated
