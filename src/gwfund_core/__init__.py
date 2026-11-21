@@ -37,7 +37,7 @@
 
 from __future__ import annotations
 
-from . import attribution, chase, fees, identities, metrics, mixing, returns
+from . import attribution, chase, fees, identities, metrics, mixing, reconcile, returns
 from .attribution import RNetReconciliation, SelfProvisionWarning
 from .errors import (
     AttributionResidualError,
@@ -52,6 +52,7 @@ from .errors import (
     PrecisionLevelViolationError,
 )
 from .metrics import DrawdownResult
+from .reconcile import ReconcileReport, ReconcileStep
 from .types import (
     FeeAccrual,
     FeeRate,
@@ -66,7 +67,7 @@ from .types import (
     WeightScheme,
 )
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 __all__ = [
     "__version__",
@@ -76,6 +77,7 @@ __all__ = [
     "fees",
     "identities",
     "metrics",
+    "reconcile",
     "mixing",
     "returns",
     # —— 类型 ——
@@ -103,6 +105,8 @@ __all__ = [
     "NoIrrSolutionError",
     "OtherResidualWarning",
     "PrecisionLevelViolationError",
+    "ReconcileReport",
+    "ReconcileStep",
     "SelfProvisionWarning",
 ]
 
