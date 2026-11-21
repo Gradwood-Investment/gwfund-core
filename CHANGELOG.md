@@ -13,9 +13,39 @@
 
 - 补齐 33 个指标（L1/M101–M115、L2/M201–M219、L3/M301–M313）的封装
 - 对账 8 步流程封装为可执行报告（附件A §8.2）
-- 黄金向量由 4 组补到 50 组（`contracts/golden_vectors.json`）
+- 黄金向量由 10 组补到 50 组（`contracts/golden_vectors.json`）
 - 陷阱 T5 / T6 / T10 / T12 / T13 实现（依赖数据层字段）
 - 混频降级的完整日志与精度徽章输出
+
+---
+
+## [0.2.0] - 2026-11-21
+
+### Added
+
+- `returns.dividend_from_acc_nav()` / `returns.derive_dividend_series()`
+  —— 由「累计净值 − 单位净值」的差分还原每份现金分红。
+
+  **解决了一个已知数据缺口**：东财 `pingzhongdata` 的 `unitMoney` 金额已被服务端剥离
+  （只剩「每10份派现金元」空模板），而 `acc_nav` 保留完整数值。
+  该推导是「现金分红总额 `Div_cash`」口径的**唯一可用入口**。
+
+  实测校验：000001 推出 **25 笔、合计 2.5730 元/份**，与《附件A》§8.2 对账样例
+  「步3 现金分红：PASS（25 笔，合计 2.573 元/份）」逐位一致。
+
+- `scripts/check_vectors.py` —— 四端一致性对拍器（读 `contracts/golden_vectors.json`）
+- `tests/test_contract.py` —— 4 项契约测试（存在性 / Tier-1 ≥4 / 全量通过 / 版本锁）
+- `tests/test_dividend.py` —— 7 项分红还原测试
+
+### Changed
+
+- 版本 `0.1.0` → `0.2.0`（新增公开 API，MINOR 递增；无破坏性变更）
+- 测试 128 → **140** 项，覆盖率 87.93% → **88.11%**
+
+### Fixed
+
+- 修正 `pyproject.toml` 与 `__init__.py` 的 UTF-8 BOM 污染（Windows PowerShell 写文件所致，
+  会导致 TOML 解析失败）
 
 ---
 

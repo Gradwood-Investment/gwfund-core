@@ -136,6 +136,77 @@ def twr_consistency_gap(chain: float, endpoint: float) -> float:
     return abs(chain - endpoint)
 
 
+def dividend_from_acc_nav(
+    acc_prev: float,
+    acc_curr: float,
+    unit_prev: float,
+    unit_curr: float,
+) -> float:
+    """由「累计净值 − 单位净值」的差分还原每份现金分红 ``d_t``。
+
+    ``d_t = (N^acc_t − N^acc_{t−1}) − (N_t − N_{t−1})``
+
+    原理：累计净值 = 单位净值 + 累计分红（只做加法，不做再投，决策 D07），
+    因此两者的**增量之差**就是当日的每份派现额。
+
+    Args:
+        acc_prev: 上一期累计净值 ``N^acc_{t-1}``。
+        acc_curr: 本期累计净值 ``N^acc_t``。
+        unit_prev: 上一期单位净值 ``N_{t-1}``。
+        unit_curr: 本期单位净值 ``N_t``。
+
+    Returns:
+        每份现金分红 ``d_t``，元/份（无分红时为 0.0）。
+        浮点噪声按 1e-9 归零，避免把舍入差异当成分红。
+
+    Note:
+        这是**分红金额的唯一可用来源**：东财 ``pingzhongdata`` 的
+        ``unitMoney`` 字段金额已被服务端剥离（只剩「每10份派现金元」这样的空模板），
+        而 ``acc_nav`` 保留完整数值（《附件B》已实测）。
+        因此该推导是「现金分红总额 ``Div_cash``」口径的唯一入口。
+
+    实测校验（000001，2026-11-21）：
+        推出 25 笔分红、合计 **2.5730 元/份**，与《附件A》§8.2 对账样例
+        「25 笔，合计 2.573 元/份」逐位一致。
+    """
+    if None in (acc_prev, acc_curr, unit_prev, unit_curr):
+        return 0.0
+    d = (acc_curr - acc_prev) - (unit_curr - unit_prev)
+    return 0.0 if abs(d) < 1e-9 else d
+
+
+def derive_dividend_series(
+    acc_navs: Sequence[float],
+    unit_navs: Sequence[float],
+) -> list[float]:
+    """整条序列的每份分红，返回与输入等长的序列（首期为 0.0）。
+
+    Args:
+        acc_navs: 累计净值序列（升序）。
+        unit_navs: 单位净值序列（升序），长度须与 ``acc_navs`` 一致。
+
+    Returns:
+        ``d_t`` 序列，首期为 ``0.0``（无前一期可比）。
+
+    Raises:
+        ValueError: 两序列长度不一致。
+
+    Note:
+        ⚠️ 该序列**不等于**复权净值。累计净值只做加法，复权净值做再投连乘
+        （决策 D07）——对有分红的基金两者会显著不同。
+        实测 000001 全区间：复权净值末值 6.0951 vs 累计净值 3.5100。
+        **算业绩只能用复权净值**。
+    """
+    if len(acc_navs) != len(unit_navs):
+        raise ValueError(f"长度不一致：{len(acc_navs)} vs {len(unit_navs)}")
+    out = [0.0] * len(acc_navs)
+    for i in range(1, len(acc_navs)):
+        out[i] = dividend_from_acc_nav(
+            acc_navs[i - 1], acc_navs[i], unit_navs[i - 1], unit_navs[i]
+        )
+    return out
+
+
 # --------------------------------------------------------------------------
 # IRR / MWR
 # --------------------------------------------------------------------------
