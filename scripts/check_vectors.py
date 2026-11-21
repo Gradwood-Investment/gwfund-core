@@ -39,13 +39,47 @@ class Comparer:
         self.failures: list[str] = []
 
     def check(self, vid: str, key: str, actual: object, expected: object) -> None:
+        # 列表/嵌套逐元素比较（如复权净值序列、分位序列）
+        if isinstance(expected, (list, tuple)):
+            if not isinstance(actual, (list, tuple)):
+                self.failures.append(f"{vid}.{key}: 期望列表，实得 {type(actual).__name__}")
+                return
+            if len(actual) != len(expected):
+                self.failures.append(
+                    f"{vid}.{key}: 长度不一致 期望 {len(expected)} 实得 {len(actual)}"
+                )
+                return
+            for i, (a, e) in enumerate(zip(actual, expected)):
+                self.check(vid, f"{key}[{i}]", a, e)
+            return
         if expected is None or actual is None:
-            if actual is not expected:
-                self.failures.append(f"{vid}.{key}: 期望 {expected!r}，实得 {actual!r}")
+            # None 与 NaN 视为等价（缺失的两种表示）
+            if actual is expected:
+                return
+            both_nan = (
+                isinstance(actual, float)
+                and isinstance(expected, float)
+                and actual != actual
+                and expected != expected
+            )
+            if both_nan:
+                return
+            if (actual is None and isinstance(expected, float) and expected != expected) or (
+                expected is None and isinstance(actual, float) and actual != actual
+            ):
+                return
+            self.failures.append(f"{vid}.{key}: 期望 {expected!r}，实得 {actual!r}")
             return
         if isinstance(expected, bool) or isinstance(actual, bool):
             if bool(actual) is not bool(expected):
                 self.failures.append(f"{vid}.{key}: 期望 {expected!r}，实得 {actual!r}")
+            return
+        # 字符串 / 枚举：一律比 .value（Enum 是 str 子类，不能走 float）
+        if isinstance(expected, str) or isinstance(actual, str) or hasattr(actual, "value"):
+            av = actual.value if hasattr(actual, "value") else str(actual)
+            ev = expected.value if hasattr(expected, "value") else str(expected)
+            if str(av) != str(ev):
+                self.failures.append(f"{vid}.{key}: 期望 {ev!r}，实得 {av!r}")
             return
         a, e = float(actual), float(expected)
         diff = abs(a - e)
@@ -56,8 +90,47 @@ class Comparer:
             )
 
 
+def _decode(v: object) -> object:
+    """把契约里的可序列化参数还原为 Python 对象。"""
+    if isinstance(v, dict):
+        if "__date__" in v:
+            return date.fromisoformat(v["__date__"])
+        if "__dec__" in v:
+            return Decimal(v["__dec__"])
+    if isinstance(v, list):
+        return [_decode(x) for x in v]
+    return v
+
+
+def _extract(obj: object, path: str) -> object:
+    if path == "__self__":
+        return obj
+    if hasattr(obj, path):
+        return getattr(obj, path)
+    if isinstance(obj, dict) and path in obj:
+        return obj[path]
+    if isinstance(obj, (list, tuple)) and path.isdigit():
+        return obj[int(path)]
+    raise KeyError(f"无法从 {type(obj).__name__} 提取 {path!r}")
+
+
+def compute_by_spec(v: dict) -> dict:
+    """按契约中的 ``call`` 规格执行一次调用（Tier-2 通用向量）。"""
+    import importlib
+
+    spec = v["call"]
+    mod = importlib.import_module(f"gwfund_core.{v['module']}")
+    fn = getattr(mod, spec["fn"])
+    args = [_decode(a) for a in spec.get("args", [])]
+    kwargs = {k: _decode(x) for k, x in (spec.get("kwargs", {}) or {}).items()}
+    res = fn(*args, **kwargs)
+    return {k: _extract(res, p) for k, p in spec["extract"].items()}
+
+
 def compute_core(v: dict) -> dict:
     """给定契约中的一组向量，用 core 现算一遍，返回可比对的字典。"""
+    if "call" in v:
+        return compute_by_spec(v)
     vid, module, inp = v["id"], v["module"], v["inputs"]
 
     if vid == "GV-01":
@@ -105,6 +178,13 @@ def compute_core(v: dict) -> dict:
         }
 
     if vid == "GV-04":
+        # 复现《附件A》§5.3 示例：R_net 取文档给定值，残差按定义为 0，
+        # 会触发 SelfProvisionWarning（误用告警），此处显式抑制。
+        import warnings as _w
+
+        from gwfund_core.attribution import SelfProvisionWarning as _SPW
+
+        _w.simplefilter("ignore", _SPW)
         a0, at = inp["a_start"], inp["a_end"]
         ns, dv = inp["net_sub"], inp["div_cash"]
         rn = attribution.r_net_from_identity(a0, at, ns, dv)
