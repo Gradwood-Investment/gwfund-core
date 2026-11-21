@@ -487,12 +487,24 @@ def annualize(period_return: float, days: float, *, min_days: float = 365.0) -> 
 
 
 def annualize_by_periods(period_return: float, periods_per_year: float) -> float:
-    """按「期数/年」年化——仅用于等间隔抽样样例（如附件A §4.5 的 3 期 = 1 季）。
+    """按「期数/年」年化——**仅用于等间隔手工算例，生产路径禁用**。
 
     ``年化 = (1 + R)^(periods_per_year) - 1``
 
-    Note:
-        这是**展示约定**，不是日历口径。生产区间收益请用 :func:`annualize`。
+    Args:
+        period_return: 区间收益率（小数）。
+        periods_per_year: 每年期数（季度=4、月度=12、周度=52）。
+
+    .. danger::
+       **生产区间收益一律用 :func:`annualize`（基于日历天数）**（SPEC-GAP-04）。
+       期数法隐含「每期等长且无缝衔接」，真实区间不满足——跨闰年/长休市会偏差 0.1–0.3 pct。
+       代码评审时凡见生产路径调用本函数即打回。
+
+    正当代用场景只有两类：
+    ① 《附件A》§4.5 这类等间隔手算样例（3 期 = 1 季 → ``k = 4``）；
+    ② 明确的月度/周度等间隔抽样研究，且**必须同时声明「期」的定义**。
+
+    区间不足 1 年**不年化**（T9），与 :func:`annualize` 一致——由调用方先判长度。
     """
     if periods_per_year <= 0:
         raise ValueError("periods_per_year 必须为正")

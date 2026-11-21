@@ -101,6 +101,43 @@ class TestPerformanceFee:
         assert hwm_high == pytest.approx(1.30)
         assert hwm_low == pytest.approx(1.30)  # 未创新高，高水位不动
 
+    def test_hwm_does_not_move_below_hurdle(self) -> None:
+        """**DEP-02 / SPEC-GAP-01**：涨 3% 未达 5% 门槛 → HWM **不动**。
+
+        原实现与 hurdle 解耦，涨 3% 也上移，导致该段涨幅永久免收业绩报酬，
+        系统性低估管理费 0.1–0.5 pct/年。
+        """
+        fee, hwm = fees.performance_fee_daily(
+            YI, nav_prev=1.03, hwm_prev=1.00, hurdle=0.05, share_pct=20,
+            on=date(2026, 6, 1),
+        )
+        assert float(fee) == 0.0
+        assert hwm == pytest.approx(1.00), "未达门槛时高水位不得上移"
+
+    def test_hwm_moves_when_hurdle_exceeded(self) -> None:
+        """涨 8% 达 5% 门槛 → 计提，且 HWM 上移至 N_t。"""
+        fee, hwm = fees.performance_fee_daily(
+            YI, nav_prev=1.08, hwm_prev=1.00, hurdle=0.05, share_pct=20,
+            on=date(2026, 6, 1),
+        )
+        assert float(fee) == pytest.approx(YI * 0.03 * 0.20, abs=1.0)
+        assert hwm == pytest.approx(1.08)
+
+    def test_hwm_path_dependence_vs_follows_nav(self) -> None:
+        """两种 HWM 口径的差异可量化：跟随净值的口径会少收费用。"""
+        # 路径：1.00 → 1.04（未达门槛）→ 1.10
+        f1, h1 = fees.performance_fee_daily(YI, 1.04, 1.00, 0.05, 20, date(2026, 6, 1))
+        f2, h2 = fees.performance_fee_daily(YI, 1.10, h1, 0.05, 20, date(2026, 6, 2))
+        g1, gh1 = fees.performance_fee_daily_hwm_follows_nav(
+            YI, 1.04, 1.00, 0.05, 20, date(2026, 6, 1)
+        )
+        g2, gh2 = fees.performance_fee_daily_hwm_follows_nav(
+            YI, 1.10, gh1, 0.05, 20, date(2026, 6, 2)
+        )
+        assert float(f1) == 0.0 and float(g1) == 0.0
+        assert h1 == pytest.approx(1.00) and gh1 == pytest.approx(1.04)
+        assert float(f2) > float(g2), "默认口径应收更多（HWM 未上移）"
+
     def test_zero_hwm_rejected(self) -> None:
         with pytest.raises(ValueError):
             fees.performance_fee_daily(YI, 1.2, 0.0, 0.05, 20, date(2026, 6, 1))
@@ -116,19 +153,35 @@ class TestTradeFee:
         assert fees.impact_cost_pct(500 * YI) == Decimal("0.30")
 
     def test_cost_rate_increases_with_aum(self) -> None:
-        small = fees.trade_cost_rate_pct(5 * YI)
-        large = fees.trade_cost_rate_pct(500 * YI)
+        small = fees.trade_cost_rate_pct(5 * YI, side="sell")
+        large = fees.trade_cost_rate_pct(500 * YI, side="sell")
         assert large > small
 
-    def test_stamp_duty_optional(self) -> None:
-        with_stamp = fees.trade_cost_rate_pct(YI, include_stamp_duty=True)
-        without = fees.trade_cost_rate_pct(YI, include_stamp_duty=False)
-        assert with_stamp - without == Decimal("0.05")
+    def test_stamp_duty_only_on_sell(self) -> None:
+        """SPEC-GAP-03 / DEP-03：印花税只在卖出侧，``sell − buy = 0.05 pct``。
+
+        原实现 ``include_stamp_duty`` 默认 `True`，买入侧会多计 0.05 pct，
+        对高换手基金的费用估算偏差可达 10–20%。
+        """
+        both = fees.trade_cost_rate_both_sides(YI)
+        assert both["sell"] - both["buy"] == Decimal("0.05")
+
+    def test_side_is_required(self) -> None:
+        """方向必须显式传入，禁止默认值（否则某条调用路径必错）。"""
+        with pytest.raises(TypeError):
+            fees.trade_cost_rate_pct(YI)  # type: ignore[call-arg]
+        with pytest.raises(ValueError, match="side"):
+            fees.trade_cost_rate_pct(YI, side="long")
 
     def test_trade_fee_scales_with_turnover(self) -> None:
-        f1 = fees.trade_fee_from_turnover("1.0", YI, YI)
-        f2 = fees.trade_fee_from_turnover("2.0", YI, YI)
+        f1 = fees.trade_fee_from_turnover("1.0", YI, YI, side="buy")
+        f2 = fees.trade_fee_from_turnover("2.0", YI, YI, side="buy")
         assert float(f2) == pytest.approx(float(f1) * 2, rel=1e-9)
+
+    def test_trade_fee_sell_higher_than_buy(self) -> None:
+        buy = fees.trade_fee_from_turnover("1.0", YI, YI, side="buy")
+        sell = fees.trade_fee_from_turnover("1.0", YI, YI, side="sell")
+        assert sell > buy
 
     def test_implied_rate_and_calibration(self) -> None:
         """式(3.7)：用年报费用反算隐含成本率。"""

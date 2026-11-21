@@ -11,11 +11,79 @@
 
 ### Planned（M1 · 目标 v1.0.0）
 
-- 补齐 33 个指标（L1/M101–M115、L2/M201–M219、L3/M301–M313）的封装
-- 对账 8 步流程封装为可执行报告（附件A §8.2）
-- 黄金向量由 10 组补到 50 组（`contracts/golden_vectors.json`）
+- 黄金向量由 12 组补到 50 组
 - 陷阱 T5 / T6 / T10 / T12 / T13 实现（依赖数据层字段）
+- 对账 8 步流程封装为可执行报告（附件A §8.2）
 - 混频降级的完整日志与精度徽章输出
+
+---
+
+## [0.3.0] - 2026-11-21
+
+**M1 门禁返工版**（依《裁定书二》P0-1~P0-6 + P1-1/P1-2）。
+core v0.1.0 的裁定是「可作开发基线，不可作验收基线」——两条最关键的守卫是恒真的：
+架构守卫拦不住 `os.environ`，归因残差门永远等于 0。本版全部修复。
+
+### Fixed — BLOCK 级
+
+- **B01 架构守卫形同虚设**：`test_only_stdlib_imports` 只遍历 `ast.ImportFrom`，
+  不看 `ast.Import`，禁用名单无 `os/pathlib/sys`。
+  → 扫描逻辑抽成纯函数 `scan_violations()`，统一遍历两类节点；
+  名单补 `os/pathlib/sys/subprocess/requests/httpx/duckdb/sqlalchemy/tqdm`；
+  **新增 8 条负控测试**（注入 `import os` 等必须报违规）。
+  **实证**：注入 `import os` 后 `test_no_forbidden_imports` 失败，移除后 14 passed。
+
+- **B02 归因残差门恒真**：`r_net_from_identity` 由 A 式反解 `R_net`、`waterfall` 再用它
+  ⇒ 残差 ≡ 0；期末 AUM 改大 27% 仍 `passed=True`。
+  → 改为**双路独立**：
+  `r_net_from_identity`（仅诊断，docstring 标注禁用）/ `r_net_from_return`（A_0×收益率）/
+  `r_net_from_disclosure`（R_gross−Fee）；新增 `reconcile_r_net()` 与
+  `waterfall_independent()`；`waterfall()` 检测到「残差恰为 0」时发 `SelfProvisionWarning`。
+  **实证**：AUM 偏 1% → 残差 10.714%、`passed=False`、瀑布抛 `AttributionResidualError`。
+
+### Fixed — P0 / 偏离
+
+- **W01 / DEP-01**：`return_decomposition.div_effect` 符号与式(6.4) 相反
+  → 改为 `−Div_cash/A_0`，三分量严格可加；新增闭合性断言（容差 1e-9）与
+  「旧缺陷指纹」回归测试（误用正号时差值恒为 `2×Div/A_0`）。
+- **DEV-001b**：年化缺口 17.2438 → **17.2456**（原为截断值相减之误）。
+- **9 条恒绿测试**删除/改写：
+  `test_deviation_dev001_is_documented` 改为断言「引擎值 == 修订后文档值」；
+  7 条 `assert reason` 的陷阱占位改为**覆盖登记表自检**
+  （已实现陷阱必须有真实测试函数、未实现陷阱必须写明阻塞原因、数量钉死）。
+- **DEP-02 / SPEC-GAP-01**：业绩报酬 HWM 在未达 hurdle 时仍上移
+  → 改为「仅在超额被计提时上移」；另提供显式变体
+  `performance_fee_daily_hwm_follows_nav()` 供合同特别约定时使用。
+- **DEP-03 / SPEC-GAP-03**：`trade_cost_rate_pct` 的 `include_stamp_duty` 默认 `True`
+  导致买入侧多计 0.05 pct → 改为 `side: Literal["buy","sell"]` **必填**，
+  印花税仅卖出侧；新增 `trade_cost_rate_both_sides()`。
+- **SPEC-GAP-04**：`annualize_by_periods` docstring 标注「仅等间隔算例，生产禁用」。
+- **SPEC-GAP-05**：`PrecisionLevel` 四值 + 中文标签 + JSON 往返 + 不得序列化为空。
+
+### Added — 9 项缺失指标（MISS-01~09，新模块 `metrics`）
+
+M204 年化波动率 / M205 最大回撤（带峰谷定位）/ M206 夏普 / M207 索提诺 /
+M208 卡玛 / M306 每元管理费对应基民盈亏 / M307 持有体验分布 /
+M310 费用率 / M313 换手率（式 3.6 估算 + 披露口径 + 偏离告警）。
+
+### Added — 契约
+
+- `contracts/golden_vectors.json` 由 4 组 → **12 组**（Tier-1 手算 4 / Tier-2 回归 8）
+- GV-01 增补 `mwr_pct`、`gap_ann_pp = 17.2456`，并引入**按字段容差**
+  （文档只公布到 4 位小数的字段用 1e-4，其余仍 1e-6）
+- 新增 GV-11（M205）、GV-12（M307）
+
+### Changed
+
+- 版本 `0.2.0` → `0.3.0`（**BREAKING**：`trade_cost_rate_pct` /
+  `trade_fee_from_turnover` 新增必填 `side`；`waterfall` 语义改为「仅做算术」
+  ，生产请用 `waterfall_independent`）
+- 测试 140 → **211** 项，覆盖率 88.11% → **90.59%**
+
+### Fixed — 工程
+
+- `src/gwfund_core/__init__.py` 曾被 PowerShell 文本往返破坏
+  （中文注释乱码 + `"attribution"` 被并入注释行导致未导出）→ 整文件重写
 
 ---
 

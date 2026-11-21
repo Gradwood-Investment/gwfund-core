@@ -214,15 +214,46 @@ class TestAttachmentA_5_3AttributionGolden:
 # ==========================================================================
 
 
-def test_deviation_dev001_is_documented() -> None:
-    """DEV-001 自检：附件A §4.5 的 MWR 原文值与本实现的差为 0.34 bp。
+def test_gv01_matches_revised_spec() -> None:
+    """GV-01 与**已修订**的《附件A》§4.5 一致（DEV-001 收口后）。
 
-    这条测试的作用是**提醒**：一旦附件A 修订（换成 0.497828%），
-    本测试会失败，提示开发者同步更新 DEVIATIONS.md 与测试注释。
+    《裁定书一》R1：附件A 已按真值修订为 ``MWR = 0.497828%``、
+    ``Gap = 4.002172 pct``、``年化 = 2.0062%``。
+
+    原测试断言「引擎值与旧文档值 0.4944% 相差恰 0.34 bp」——文档修订后该断言失效。
+    按裁定要求改为：断言**引擎值 == 文档值**，并保留「NPV(root)≈0」这条
+    不依赖任何文档数字的自洽校验。
     """
-    spec_value = 0.4944e-2
-    true_value = 0.4978283759868921e-2
-    diff_bp = abs(true_value - spec_value) * 10_000
-    assert diff_bp == pytest.approx(0.34, abs=0.01), (
-        "附件A §4.5 的 MWR 原文值可能已被修订，请同步 DEVIATIONS.md DEV-001"
+    doc_mwr_pct = 0.497828      # 《附件A》§4.5 修订后值（百分数）
+    doc_gap_pct = 4.002172      # 修订后缺口（百分点）
+    engine_mwr = returns.irr([-1_000_000, -500_000, 0, 1_520_000]).value
+    engine_mwr_pct = engine_mwr * 100
+    engine_gap_pct = returns.investor_gap(0.045, engine_mwr) * 100
+
+    # T-1 容差（文档示例逐位复现）：1e-6
+    assert engine_mwr_pct == pytest.approx(doc_mwr_pct, abs=1e-6), (
+        f"引擎 MWR {engine_mwr_pct:.9f}% 与修订后附件A {doc_mwr_pct}% 不符"
+    )
+    assert engine_gap_pct == pytest.approx(doc_gap_pct, abs=1e-6)
+    # 自洽校验：不依赖任何文档数字
+    cfs = [-1_000_000, -500_000, 0, 1_520_000]
+    npv = sum(cf / (1.0 + engine_mwr) ** t for cf, t in zip(cfs, range(4)))
+    assert abs(npv) < 1e-3, f"MWR 不是 NPV=0 的根：NPV={npv}"
+
+
+def test_gv01_annualized_gap_is_172456() -> None:
+    """DEV-001b：年化缺口 = **17.2456 pp**（不是 17.2438）。
+
+    凌霄渡复核指出：原值的错因是「用截断值相减」。
+    纪律：**中间值必须保留 6 位小数再相减**。
+    """
+    mwr = returns.irr([-1_000_000, -500_000, 0, 1_520_000]).value
+    twr = 0.045
+    # 3 期 = 1 季 → 每年 4 期（仅用于等间隔算例，SPEC-GAP-04）
+    twr_ann = returns.annualize_by_periods(twr, 4) * 100
+    mwr_ann = returns.annualize_by_periods(mwr, 4) * 100
+    gap_ann = twr_ann - mwr_ann
+    assert gap_ann == pytest.approx(17.2456, abs=1e-4), (
+        f"年化缺口应为 17.2456 pp，实得 {gap_ann:.6f}；"
+        f"（TWR年化 {twr_ann:.6f} / MWR年化 {mwr_ann:.6f}）"
     )

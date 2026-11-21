@@ -189,14 +189,28 @@ def performance_fee_daily(
     share_pct: float,
     on: date,
 ) -> tuple[Decimal, float]:
-    """业绩报酬型浮动管理费的单日计提，附件A §3.2。
+    """业绩报酬型浮动管理费的单日计提，附件A §3.2 + §4.7 SPEC-GAP-01。
 
     ``F_perf,t = max(0, (N_t − HWM_{t−1}) / HWM_{t−1} − hurdle) × x% × A_{t−1}``
+
+    **HWM 上移条件（DEP-02 / SPEC-GAP-01 修复）**：
+
+    .. math::
+
+       H_t = \\begin{cases} N_t & \\text{若 } N_t/H_{t-1} - 1 > h \\\\
+                            H_{t-1} & \\text{否则} \\end{cases}
+
+    HWM 的经济含义是「投资者**已为此付费**的最高净值」。未达门槛的涨幅**尚未付费**，
+    若上移，则该段涨幅**永久免收**业绩报酬，与合同意图相反，会**系统性低估**
+    管理费 0.1–0.5 pct/年（路径依赖，区间越长偏差越大）。
+
+    原实现 ``new_hwm = nav_prev if nav_prev > hwm_prev else hwm_prev`` 与 hurdle
+    **解耦**，正是该缺陷。
 
     Args:
         a_prev: 前一交易日资产净值。
         nav_prev: 当日单位净值 ``N_t``。
-        hwm_prev: 上一计提日的高水位 ``HWM_{t−1}``。
+        hwm_prev: 上一计提日的高水位 ``H_{t−1}``。
         hurdle: 门槛收益率（小数，``0.05`` 表示 5%）。
         share_pct: 超额收益分成比例（百分数，``20`` 表示 20%）。
         on: 计提日。
@@ -205,17 +219,49 @@ def performance_fee_daily(
         ``(当日业绩报酬 Decimal 元, 更新后的高水位)``。
 
     Note:
-        附件A §3.2 明确：浮动费率**必须逐日模拟**，不允许用「年化平均费率」近似，
-        因为高水位是路径依赖的，典型偏差 0.1–0.5 pct/年。
+        若某基金合同确为「HWM 无条件跟随净值」（少见），必须在
+        ``fund_fee.float_rule`` 显式配置 ``hwm_follows_nav: true``，
+        由调用方改走 :func:`performance_fee_daily_hwm_follows_nav`，**不得默认**。
     """
     if hwm_prev is None or hwm_prev <= 0:
         raise ValueError(f"高水位必须为正：{hwm_prev}")
     excess = nav_prev / hwm_prev - 1.0 - hurdle
     if excess <= 0:
+        # 未达门槛：不计提，高水位**不动**（DEP-02）
         return Decimal(0).quantize(CENT), hwm_prev
     fee = _d(a_prev) * _d(excess) * _d(share_pct) / _HUNDRED
+    # 仅在实际计提超额报酬时上移高水位（SPEC-GAP-01）
+    return fee.quantize(CENT, rounding=ROUND_HALF_UP), nav_prev
+
+
+def performance_fee_daily_hwm_follows_nav(
+    a_prev: Decimal | int | float | str,
+    nav_prev: float,
+    hwm_prev: float,
+    hurdle: float,
+    share_pct: float,
+    on: date,
+) -> tuple[Decimal, float]:
+    """显式变体：**HWM 无条件跟随净值**（仅当合同如此约定时使用）。
+
+    与 :func:`performance_fee_daily` 的唯一差别：即使未达 hurdle，
+    只要 ``N_t > H_{t-1}`` 就把高水位上移到 ``N_t``。
+
+    .. warning::
+       该口径会让未付费的涨幅抬高新基准，**降低**未来业绩报酬。
+       只有在合同原文明确「高水位无条件跟随」时才可使用，
+       并须在 ``fund_fee.float_rule`` 中留痕。
+    """
+    if hwm_prev is None or hwm_prev <= 0:
+        raise ValueError(f"高水位必须为正：{hwm_prev}")
+    excess = nav_prev / hwm_prev - 1.0 - hurdle
+    fee = Decimal(0).quantize(CENT)
+    if excess > 0:
+        fee = (_d(a_prev) * _d(excess) * _d(share_pct) / _HUNDRED).quantize(
+            CENT, rounding=ROUND_HALF_UP
+        )
     new_hwm = nav_prev if nav_prev > hwm_prev else hwm_prev
-    return fee.quantize(CENT, rounding=ROUND_HALF_UP), new_hwm
+    return fee, new_hwm
 
 
 # --------------------------------------------------------------------------
@@ -235,16 +281,37 @@ def impact_cost_pct(aum: Decimal | int | float | str) -> Decimal:
 def trade_cost_rate_pct(
     aum: Decimal | int | float | str,
     *,
+    side: str,
     commission_pct: Decimal | int | float | str = COMMISSION_PCT,
-    include_stamp_duty: bool = True,
     include_transfer: bool = True,
 ) -> Decimal:
-    """单边交易成本率（百分数），附件A §3.3 式(3.5) 的括号项。
+    """单边交易成本率（百分数），附件A §3.3 式(3.5) + §4.7 SPEC-GAP-03。
 
-    ``c_comm + c_stamp·1[卖出] + c_trans + c_impact``
+    ``c_comm + c_stamp·1[side=="sell"] + c_trans + c_impact``
+
+    Args:
+        aum: 季末资产净值，用于冲击成本分档。
+        side: **必填**，``"buy"`` 或 ``"sell"``。
+            印花税仅在 ``"sell"`` 时计入（§3.3 ``c_stamp·1[卖出]``）。
+        commission_pct: 佣金率（双边均收）。
+        include_transfer: 是否含过户费（双边）。
+
+    Returns:
+        单边成本率（百分数）。
+
+    Raises:
+        ValueError: ``side`` 不是 ``"buy"`` / ``"sell"``。
+
+    .. danger::
+       **禁止提供「默认方向」**（DEP-03 / SPEC-GAP-03）。任何默认值
+       都会在某条调用路径上错——若默认含印花税，买入侧会**多计 0.05 pct**，
+       对高换手基金的交易费用估算偏差可达 10–20%。
+       实测对照：``sell − buy = 0.05 pct``。
     """
+    if side not in ("buy", "sell"):
+        raise ValueError(f'side 必须是 "buy" 或 "sell"，收到 {side!r}')
     rate = _d(commission_pct)
-    if include_stamp_duty:
+    if side == "sell":
         rate += STAMP_DUTY_PCT
     if include_transfer:
         rate += TRANSFER_FEE_PCT
@@ -252,17 +319,32 @@ def trade_cost_rate_pct(
     return rate
 
 
+def trade_cost_rate_both_sides(
+    aum: Decimal | int | float | str,
+    *,
+    commission_pct: Decimal | int | float | str = COMMISSION_PCT,
+) -> dict[str, Decimal]:
+    """买卖两侧成本率（便于逐笔核对 ``sell − buy = 0.05 pct``）。"""
+    return {
+        "buy": trade_cost_rate_pct(aum, side="buy", commission_pct=commission_pct),
+        "sell": trade_cost_rate_pct(aum, side="sell", commission_pct=commission_pct),
+    }
+
+
 def trade_fee_from_turnover(
     turnover: Decimal | int | float | str,
     a_prev: Decimal | int | float | str,
     aum: Decimal | int | float | str,
     *,
+    side: str,
     commission_pct: Decimal | int | float | str = COMMISSION_PCT,
-    include_stamp_duty: bool = True,
 ) -> Decimal:
     """按换手率估算交易费用，附件A §3.3 式(3.5)。
 
     ``F_trade,t = Turnover_t × A_{t−1} × 单边成本率``
+
+    Args:
+        side: **必填**（见 :func:`trade_cost_rate_pct` 的 DEP-03 说明）。
 
     Warning:
         该值是**估算**，必须标注估算等级，并用年报披露值校准（式 3.7）。
@@ -271,9 +353,7 @@ def trade_fee_from_turnover(
     """
     a = _d(a_prev)
     tur = _d(turnover)
-    rate = trade_cost_rate_pct(
-        aum, commission_pct=commission_pct, include_stamp_duty=include_stamp_duty
-    )
+    rate = trade_cost_rate_pct(aum, side=side, commission_pct=commission_pct)
     return (tur * a * rate / _HUNDRED).quantize(CENT, rounding=ROUND_HALF_UP)
 
 

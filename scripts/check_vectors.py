@@ -65,7 +65,17 @@ def compute_core(v: dict) -> dict:
         rs = [returns.daily_return(navs[i - 1], navs[i]) for i in range(1, len(navs))]
         twr = returns.chain_return(rs)
         mwr = returns.irr(cf, ts).value
-        return {"twr": twr, "mwr": mwr, "gap_pct": returns.investor_gap(twr, mwr) * 100}
+        # 3 期 = 1 季 → 每年 4 期（SPEC-GAP-04：仅等间隔算例可用期数法）
+        gap_ann = (
+            returns.annualize_by_periods(twr, 4) - returns.annualize_by_periods(mwr, 4)
+        ) * 100
+        return {
+            "twr": twr,
+            "mwr": mwr,
+            "mwr_pct": mwr * 100,
+            "gap_pct": returns.investor_gap(twr, mwr) * 100,
+            "gap_ann_pp": gap_ann,
+        }
 
     if vid == "GV-02":
         cf, ts = inp["cashflows"], inp["times"]
@@ -157,6 +167,24 @@ def compute_core(v: dict) -> dict:
         f = fees.daily_fee_by_aum_tier(Decimal(str(inp["a_prev"])), date(2026, 6, 1), tier)
         return {"daily_fee": float(f)}
 
+    if vid == "GV-11":
+        from gwfund_core import metrics
+
+        dd = metrics.max_drawdown(inp["equity_curve"])
+        if dd is None:
+            raise ValueError("max_drawdown 返回 None")
+        return {
+            "mdd": dd.mdd,
+            "peak_index": dd.peak_index,
+            "trough_index": dd.trough_index,
+        }
+
+    if vid == "GV-12":
+        from gwfund_core import metrics
+
+        he = metrics.holding_experience(inp["navs"], window=inp["window"])
+        return {"samples": he["samples"], "win_rate": he["win_rate"]}
+
     raise KeyError(f"{vid}: 未知向量（module={module}）——契约新增了向量但本脚本未实现")
 
 
@@ -183,11 +211,17 @@ def main(argv: list[str] | None = None) -> int:
             cmp.failures.append(f"{v['id']}: 计算抛错 {type(exc).__name__}: {exc}")
             continue
         before = len(cmp.failures)
+        # 按字段容差覆盖（仅用于「文档只公布到 N 位小数」的字段，须在契约中显式声明）
+        overrides = v.get("tolerance_overrides", {})
         for key, expected in v["expected"].items():
             if key not in actual:
                 cmp.failures.append(f"{v['id']}.{key}: 引擎未返回该字段")
                 continue
+            saved_tol = cmp.tol
+            if key in overrides:
+                cmp.tol = float(overrides[key])
             cmp.check(v["id"], key, actual[key], expected)
+            cmp.tol = saved_tol
         ok = len(cmp.failures) == before
         results.append({"id": v["id"], "name": v["name"], "tier": v["tier"], "passed": ok})
         if args.verbose:

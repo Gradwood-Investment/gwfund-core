@@ -246,19 +246,79 @@ def test_t14_dividend_uses_record_date_shares() -> None:
 # --------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize(
-    ("trap_id", "reason"),
-    [
-        ("T5", "A/C 份额合并需数据层 share_class 字段，v0.2.0 实现"),
-        ("T6", "ETF 联接双重收费需 fund_type 与标的 ETF 映射，v0.2.0 实现"),
-        ("T7", "货币基金摊余成本法：v1 不覆盖货币基金（决策 D03）"),
-        ("T8", "QDII 汇率与 T+2：v1 不覆盖 QDII（决策 D03）"),
-        ("T10", "清盘/转型需 fund_profile.status 与分段逻辑，v0.2.0 实现"),
-        ("T12", "定开/持有期单日集中申赎需产品类型字段，v0.2.0 实现"),
-        ("T13", "摆动定价需 fund_nav.flag 标记，v0.2.0 实现"),
-    ],
-)
-def test_trap_pending_registered(trap_id: str, reason: str) -> None:
-    """未覆盖陷阱的显式登记（M1 门禁前必须全部转 ✅，附件A V8）。"""
-    warnings.warn(f"{trap_id} 尚未实现：{reason}", UserWarning, stacklevel=1)
-    assert reason, f"{trap_id} 必须有明确的未实现理由"
+# --------------------------------------------------------------------------
+# 陷阱覆盖登记表：用「表 ↔ 测试函数名」的对应关系代替恒绿断言
+# --------------------------------------------------------------------------
+
+#: 已实现的陷阱 → 对应的测试函数名（**必须真实存在**）
+IMPLEMENTED_TRAPS: dict[str, str] = {
+    "T1": "test_t1_reinvest_does_not_create_fake_net_subscription",
+    "T2": "test_t2_redeem_fee_to_fund_never_enters_other",
+    "T3": "test_t3_subscription_fee_does_not_touch_net_sub_or_fee",
+    "T4": "test_t4_split_keeps_return_unchanged",
+    "T9": "test_t9_no_annualization_under_one_year",
+    "T11": "test_t11_endpoint_vs_chain_consistency",
+    "T14": "test_t14_dividend_uses_record_date_shares",
+}
+
+#: 未实现的陷阱 → 阻塞原因（必须说明依赖什么才能做）
+PENDING_TRAPS: dict[str, str] = {
+    "T5": "A/C 份额合并需数据层 share_class 字段",
+    "T6": "ETF 联接双重收费需 fund_type 与标的 ETF 映射",
+    "T7": "货币基金摊余成本法：v1 不覆盖货币基金（决策 D03）",
+    "T8": "QDII 汇率与 T+2：v1 不覆盖 QDII（决策 D03）",
+    "T10": "清盘/转型需 fund_profile.status 与分段逻辑",
+    "T12": "定开/持有期单日集中申赎需产品类型字段",
+    "T13": "摆动定价需 fund_nav.flag 标记",
+}
+
+
+def test_all_fourteen_traps_are_registered() -> None:
+    """T1–T14 必须全部在登记表中出现（实现或待实现，不得漏登记）。
+
+    这条替代了原来的 7 条 ``assert reason`` 恒绿测试——
+    恒绿断言只证明「变量非空」，对质量零贡献；
+    本测试至少能抓住「新增陷阱但忘了登记」这类真实遗漏。
+    """
+    expected = {f"T{i}" for i in range(1, 15)}
+    registered = set(IMPLEMENTED_TRAPS) | set(PENDING_TRAPS)
+    assert registered == expected, (
+        f"陷阱登记不完整：缺 {sorted(expected - registered)}，"
+        f"多 {sorted(registered - expected)}"
+    )
+    assert not (set(IMPLEMENTED_TRAPS) & set(PENDING_TRAPS)), "同一陷阱不能既实现又待实现"
+
+
+def test_implemented_traps_have_real_tests() -> None:
+    """登记为「已实现」的陷阱，其测试函数必须**真实存在于本模块**。
+
+    这是实现方最容易偷懒的地方：把陷阱标成「已覆盖」但并没有写测试。
+    本测试会真的去模块命名空间里查函数对象。
+    """
+    import sys
+
+    module = sys.modules[__name__]
+    missing = [
+        f"{trap} → {func}"
+        for trap, func in IMPLEMENTED_TRAPS.items()
+        if not hasattr(module, func)
+    ]
+    assert not missing, "以下陷阱声称已实现但没有对应测试函数：\n" + "\n".join(missing)
+
+
+def test_pending_traps_have_blocking_reason() -> None:
+    """待实现的陷阱必须写明阻塞原因（依赖什么），否则无法排期。"""
+    for trap, reason in PENDING_TRAPS.items():
+        assert reason and len(reason) >= 8, f"{trap} 的阻塞原因过于笼统：{reason!r}"
+
+
+def test_pending_trap_count_is_visible() -> None:
+    """把待实现数量钉死：M1 前不得增加。
+
+    数字变化会强制开发者回来更新 CHANGELOG 与门禁报告——
+    这比「悄悄多一个待实现」安全。
+    """
+    assert len(PENDING_TRAPS) == 7, (
+        f"待实现陷阱数变为 {len(PENDING_TRAPS)}；"
+        f"若已补齐请同步删除本断言并更新 CHANGELOG"
+    )
