@@ -268,6 +268,7 @@ def test_version_is_semver() -> None:
 
     import gwfund_core
 
-    assert _re.fullmatch(r"\d+\.\d+\.\d+", gwfund_core.__version__), (
-        f"__version__ 不是 SemVer：{gwfund_core.__version__}"
-    )
+    # 允许 PEP 440 预发布后缀（rc1 / a1 / b2 / .dev1），如 1.0.0rc1
+    assert _re.fullmatch(
+        r"\d+\.\d+\.\d+(?:[-.]?(?:a|b|rc|dev|post)\d+)?", gwfund_core.__version__
+    ), f"__version__ 不是 SemVer：{gwfund_core.__version__}"

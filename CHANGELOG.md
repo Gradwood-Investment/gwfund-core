@@ -26,6 +26,38 @@
 
 ---
 
+## [1.0.0rc1] - 2026-11-21
+
+### Added —— 裁定书三 §二 C1-C4（诊断可见性与拦截）
+
+`R_net` 双路对账在 M1 仅作诊断，但「诊断」不等于「可以静默」。四条硬条件落地：
+
+- **C1** `build_attribution`：`reconcile_gap` + `estimate_grade` **永远在场**（无法计算时为 None）
+- **C2** `should_include_components`：C 级分量**默认不返回**，需显式 `include_diagnostics=True`
+- **C3** `assert_export_allowed`：文章/分享卡/报告引用 C 级分量抛 `DiagnosticNotAllowedError`
+- **C4** `reconcile_alert`：返回 `(是否告警, 日志码, 文案)`；**core 不写日志**，由 API 层记
+
+阶梯门写死：M1 仅诊断 / M2 ≤5% / M3 ≤1%；未达则分量永久标 C。
+
+### Changed
+
+- 版本 0.4.0 → **1.0.0rc1**（M1 有条件通过，待衡鉴复跑后转 v1.0.0）
+- `test_version_is_semver` 支持 PEP 440 预发布后缀（`1.0.0rc1`）
+- README 补 §7.5：C1-C4 纪律 + ratio 定义 + 两个中位统计量的分工
+
+### Fixed
+
+- **架构门抓到 core 引入 `logging`**：初版在 core 里写 WARN 日志，违反零依赖纯函数约束。
+  改为「core 判定该不该叫，API 决定叫到哪」，并新增纯度守卫断言。
+  这不是妥协，是正确的分层——日志是 I/O 副作用，不属于纯函数库。
+
+### 测试
+
+- 298 项全绿（+32），覆盖率 **92.12%**
+- 黄金向量 67/67 通过
+
+---
+
 ## [Unreleased]
 
 ### Planned（M1 · 目标 v1.0.0）
