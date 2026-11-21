@@ -1,4 +1,4 @@
-"""四端一致性对拍器：按 `contracts/golden_vectors.json` 逐项校验。
+"""四端一致性对拍器：按仓库内 `contracts/golden_vectors.json` 逐项校验。
 
 **任何一端都复制这个脚本的逻辑**（不是复制算法）：
 API / Web / 桌面 / 小程序各自把「按 vector_id 算出的数」提交给本脚本的形状，
@@ -28,7 +28,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from gwfund_core import attribution, chase, fees, identities, mixing, returns  # noqa: E402
 
-VECTORS_PATH = ROOT.parent / "contracts" / "golden_vectors.json"
+VECTORS_PATH = ROOT / "contracts" / "golden_vectors.json"
 
 
 class Comparer:
@@ -276,7 +276,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if not VECTORS_PATH.exists():
         print(f"[FAIL] 契约文件缺失：{VECTORS_PATH}")
-        print("       先运行 python 10_dev/contracts/build_golden_vectors.py")
+        print("       先运行 python contracts/build_golden_vectors.py")
         return 1
 
     data = json.loads(VECTORS_PATH.read_text(encoding="utf-8"))

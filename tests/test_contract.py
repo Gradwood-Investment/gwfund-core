@@ -21,7 +21,7 @@ CHECKER = CORE_ROOT / "scripts" / "check_vectors.py"
 
 
 def _vectors_path() -> Path:
-    return CORE_ROOT.parent / "contracts" / "golden_vectors.json"
+    return CORE_ROOT / "contracts" / "golden_vectors.json"
 
 
 @pytest.mark.golden
@@ -30,7 +30,7 @@ def test_contract_file_exists() -> None:
     path = _vectors_path()
     assert path.exists(), (
         f"契约缺失：{path}\n"
-        f"生成方式：python 10_dev/contracts/build_golden_vectors.py"
+        f"生成方式：python contracts/build_golden_vectors.py"
     )
     data = json.loads(path.read_text(encoding="utf-8"))
     assert data["vectors"], "契约内无向量"

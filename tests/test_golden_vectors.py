@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import warnings
+
 import pytest
 
 from gwfund_core import attribution, fees, identities, returns
@@ -174,26 +176,64 @@ class TestAttachmentA_5_3AttributionGolden:
         assert float(r_net) / YI == pytest.approx(15.4241, abs=1e-4)
 
     def test_waterfall_closes(self) -> None:
-        """式(6.2)：归因残差 0.00%，``passed`` 为 True。"""
-        r_net = attribution.r_net_from_identity(
-            self.a_start, self.a_end, self.net_sub, self.div_cash
-        )
-        wf = attribution.waterfall(
-            self.a_start, self.net_sub, r_net, self.div_cash, self.a_end
-        )
-        assert wf.passed is True
-        assert wf.residual_pct == pytest.approx(0.0, abs=1e-9)
+        """式(6.2)：归因残差 0.00%；但 R_net 来自 A 式反解 → **门不可信**。
 
-    def test_identity_a_closes(self) -> None:
-        """式(A) 在混频口径下相对残差 < 0.5%。"""
+        《裁定书四》P0-1：残差为 0 是自证指纹，``passed`` 必须为 False。
+        """
         r_net = attribution.r_net_from_identity(
             self.a_start, self.a_end, self.net_sub, self.div_cash
         )
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", attribution.SelfProvisionWarning)
+            wf = attribution.waterfall(
+                self.a_start, self.net_sub, r_net, self.div_cash, self.a_end
+            )
+        assert wf.residual_pct == pytest.approx(0.0, abs=1e-9)
+        assert wf.passed is False, "自证指纹下 passed 必须为 False"
+        assert wf.gate_status == "self_provision"
+
+    def test_identity_a_residual_is_actually_checked(self) -> None:
+        """式(A) 的残差门**真的会失败**——不能是恒真断言（《裁定书四》P0-2）。
+
+        原实现用 ``r_net_from_identity`` 反解 R_net 再喂回 ``check_identity_a``，
+        残差按定义恒为 0，断言 ``passed is True`` **无论如何都通过**，等于没有测试。
+
+        现在改为两条真断言：
+        ① 用**独立路径**（``r_net_from_return``，不由 A 式反解）构造 R_net，
+           残差应真实为 0 —— 证明一致数据下门能通过；
+        ② 把期末 AUM 人为 +1%，同一门必须**变红** —— 证明它不是恒真。
+        """
+        # 附件A §5.3 数据：A_0=26.44亿、A_T=39.38亿、NetSub=-2.4841亿、Div=0
+        # 隐含区间收益率 = R_net / A_0 = 15.4241 / 26.44 ≈ 58.3362%
+        implied_return = 15.4241 / 26.44
+        r_net = attribution.r_net_from_return(self.a_start, implied_return)
+
+        # ① 一致数据 → 门通过
         chk = identities.check_identity_a(
-            self.a_start, self.a_end, r_net, self.net_sub, self.div_cash,
+            self.a_start,
+            self.a_end,
+            r_net,
+            self.net_sub,
+            self.div_cash,
             mixed_freq=True,
         )
-        assert chk.passed is True
+        assert chk.passed is True, f"一致数据下应通过，实际残差 {chk.residual_pct:.6%}"
+        assert chk.residual_pct < 0.005
+
+        # ② 期末 AUM +1% → 门必须变红（证明断言不是恒真）
+        bad_end = self.a_end * 1.01
+        chk_bad = identities.check_identity_a(
+            self.a_start,
+            bad_end,
+            r_net,
+            self.net_sub,
+            self.div_cash,
+            mixed_freq=True,
+        )
+        assert chk_bad.passed is False, (
+            f"期末 AUM +1% 后门必须失败，否则是恒真断言（实际 residual_pct="
+            f"{chk_bad.residual_pct:.6%}）"
+        )
 
     def test_waterfall_segments(self) -> None:
         """瀑布六段的金额与符号（分红段为负、期末等于 A_T）。"""

@@ -116,7 +116,18 @@ class WaterfallSegment:
 
 @dataclass(frozen=True)
 class WaterfallResult:
-    """规模归因瀑布结果。"""
+    """规模归因瀑布结果。
+
+    ``passed`` 的语义（《裁定书四》P0-1）：
+    **它是「这道门是否可信且通过」，不是「算术上闭合」**。
+    自证指纹场景（``R_net`` 由 A 式反解）残差按定义恒为 0，
+    此时 ``passed`` **必须为 False** —— 否则下游只读布尔值就等于没有门。
+
+    判定顺序：
+    1. 自证指纹 → ``gate_status="self_provision"``、``passed=False``；
+    2. 残差超阈值 → ``gate_status="residual_exceeded"``、``passed=False``；
+    3. 否则 → ``gate_status="ok"``、``passed=True``。
+    """
 
     segments: tuple[WaterfallSegment, ...]
     a_start: Decimal
@@ -124,6 +135,32 @@ class WaterfallResult:
     residual: Decimal
     residual_pct: float
     passed: bool
+    gate_status: str = "ok"
+    """``ok`` / ``self_provision`` / ``residual_exceeded``。"""
+
+    @property
+    def gate_ok(self) -> bool:
+        """门的最终结论——**与 ``passed`` 同义**，保留此名以便下游显式读「门」。"""
+        return self.passed
+
+    def require_pass(self) -> None:
+        """门未通过时抛错（供调用方在关键路径强制阻断）。
+
+        Raises:
+            gwfund_core.errors.AttributionResidualError: ``passed`` 为 ``False``。
+        """
+        if self.passed:
+            return
+        from .errors import AttributionResidualError
+
+        if self.gate_status == "self_provision":
+            raise AttributionResidualError(
+                "归因门不可信：R_net 来自 A 式反解，残差按定义恒为 0（B02）。"
+                "请改用 waterfall_independent() 或先做 reconcile_r_net()。"
+            )
+        raise AttributionResidualError(
+            f"归因残差 {self.residual}（{self.residual_pct:.6%}）超阈值"
+        )
 
 
 @dataclass(frozen=True)

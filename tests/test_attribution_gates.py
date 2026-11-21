@@ -95,14 +95,46 @@ class TestRNetTwoPaths:
 
 
 class TestSelfProvisionGuard:
-    def test_warns_when_residual_is_exactly_zero(self) -> None:
-        """用 A 式反解的 R_net 跑瀑布 → 残差恰为 0 → 必须发警告。"""
+    def test_self_provision_gate_is_false(self) -> None:
+        """《裁定书四》P0-1：自证指纹下 ``passed`` **必须为 False**。
+
+        用 A 式反解的 R_net 跑瀑布 → 残差恰为 0 → 算术上确实「平」，
+        但这道门按定义失效，**warning 不能替代状态**：
+        下游只要读布尔值或过滤掉 warning，就等于没有门。
+        """
         a0, at, ns, dv = 1_000.0, 1_200.0, 100.0, 0.0
         rn = attribution.r_net_from_identity(a0, at, ns, dv)
-        with pytest.warns(SelfProvisionWarning, match="残差恰为 0"):
+        with pytest.warns(SelfProvisionWarning):
             wf = attribution.waterfall(a0, ns, rn, dv, at)
         assert wf.residual == 0
-        assert wf.passed is True  # 数学上确实平，所以只能靠警告提示失效
+        assert wf.passed is False, "自证指纹下 passed 必须为 False"
+        assert wf.gate_status == "self_provision"
+        assert wf.gate_ok is False
+
+    def test_self_provision_declared_explicitly(self) -> None:
+        """显式声明 ``r_net_source='identity'`` 时同样判不可信。"""
+        a0, at, ns, dv = 1_000.0, 1_200.0, 100.0, 0.0
+        rn = attribution.r_net_from_identity(a0, at, ns, dv)
+        with pytest.warns(SelfProvisionWarning):
+            wf = attribution.waterfall(a0, ns, rn, dv, at, r_net_source="identity")
+        assert wf.passed is False
+        assert wf.gate_status == "self_provision"
+
+    def test_self_provision_require_pass_raises(self) -> None:
+        """``require_pass()`` 必须抛错，不能静默放行。"""
+        a0, at, ns, dv = 1_000.0, 1_200.0, 100.0, 0.0
+        rn = attribution.r_net_from_identity(a0, at, ns, dv)
+        with pytest.warns(SelfProvisionWarning):
+            wf = attribution.waterfall(a0, ns, rn, dv, at)
+        with pytest.raises(AttributionResidualError, match="不可信"):
+            wf.require_pass()
+
+    def test_independent_source_not_flagged_as_self_provision(self) -> None:
+        """独立路径即便残差恰为 0，也**不得**被判为自证（避免假阳性）。"""
+        a0, at, ns, dv = 1_000.0, 1_200.0, 100.0, 0.0
+        wf = attribution.waterfall_independent(a0, ns, dv, at, period_return=0.10)
+        assert wf.passed is True
+        assert wf.gate_status == "ok"
 
     def test_independent_path_can_fail_loudly(self) -> None:
         """独立路径在数据不一致时必须抛错（这才是有效的门禁）。"""
@@ -184,5 +216,7 @@ def test_attachment_a_5_3_still_closes_after_fix() -> None:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", SelfProvisionWarning)
         wf = attribution.waterfall(a_start, net_sub, rn, div, a_end)
-    assert wf.passed is True
+    # 附件A §5.3 的 rn 来自 A 式反解 → 自证指纹 → passed 必须为 False
+    assert wf.passed is False
+    assert wf.gate_status == "self_provision"
     assert wf.residual_pct == pytest.approx(0.0, abs=1e-12)

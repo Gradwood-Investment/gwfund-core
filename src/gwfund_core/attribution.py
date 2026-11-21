@@ -194,6 +194,7 @@ def waterfall(
     other: Decimal | int | float | str = 0,
     *,
     raise_on_fail: bool = False,
+    r_net_source: str = "unknown",
 ) -> WaterfallResult:
     """规模归因瀑布（第一层·金额归因），附件A §5.1 式(6.1)。
 
@@ -219,6 +220,11 @@ def waterfall(
         other: 其他权益变动净额。**注意**：赎回费归基金资产**不在**此项内
             （它属 ``R_gross`` 的其他收入），见附件A §4.4。
         raise_on_fail: ``True`` 时残差超阈值直接抛 :class:`AttributionResidualError`。
+        r_net_source: ``R_net`` 的来源声明（《裁定书四》P0-1）。
+            ``"identity"`` = 由 A 式反解（**残差门必然失效**，直接判 ``passed=False``）；
+            ``"return"`` / ``"disclosure"`` = 独立路径（残差门有效）；
+            ``"unknown"``（默认）= 不声明，退回启发式指纹检测。
+            **独立路径请务必显式声明**，否则「数据恰好完美闭合」会被误判为自证。
 
     Returns:
         :class:`WaterfallResult`，含各段金额、占期初 AUM 比例与残差。
@@ -234,18 +240,46 @@ def waterfall(
     residual = (explained - at).quantize(_CENT)
     denom = max(abs(a0), abs(at))
     residual_pct = float(abs(residual) / denom) if denom else 0.0
-    passed = Decimal(str(residual_pct)) < REL_TOL_ATTR
+    residual_ok = Decimal(str(residual_pct)) < REL_TOL_ATTR
 
-    # B02 运行时守卫：残差恰为 0 是「自我印证」的典型指纹
-    if abs(residual) < Decimal("0.000001") and rn != 0:
-        expected_identity = a0 + ns + rn - dv + ot
-        if abs(expected_identity - at) < Decimal("0.000001"):
-            warnings.warn(
-                "归因残差恰为 0：R_net 极可能来自 A 式反解，残差门已失效（B02）。"
-                "生产路径请改用 waterfall_independent() 或先做 reconcile_r_net()。",
-                SelfProvisionWarning,
-                stacklevel=2,
-            )
+    # ---- 自证指纹检测（《裁定书四》P0-1）--------------------------------
+    # 残差恰为 0 且 rn != 0 ⇒ R_net 极可能由 A 式反解得出，残差门按定义恒成立。
+    # **warning 不能替代状态**：此时 passed 必须为 False，否则下游只读布尔值
+    # 或过滤掉 warning，就等于没有门（B02 的残留形态）。
+    self_provision = False
+    if r_net_source == "identity":
+        # 显式声明来自 A 式反解 —— 残差门按定义恒成立，直接判不可信
+        self_provision = True
+        warnings.warn(
+            "R_net 显式声明来自 A 式反解（r_net_source='identity'）："
+            "残差门按定义恒为 0，已判 passed=False（B02）。",
+            SelfProvisionWarning,
+            stacklevel=2,
+        )
+    elif r_net_source == "unknown":
+        # 未声明来源 —— 退回启发式：残差恰为 0 且 rn != 0 视为自证指纹
+        if abs(residual) < Decimal("0.000001") and rn != 0:
+            expected_identity = a0 + ns + rn - dv + ot
+            if abs(expected_identity - at) < Decimal("0.000001"):
+                self_provision = True
+                warnings.warn(
+                    "归因残差恰为 0：R_net 极可能来自 A 式反解，残差门已失效（B02）。"
+                    "生产路径请改用 waterfall_independent() 或先做 reconcile_r_net()。",
+                    SelfProvisionWarning,
+                    stacklevel=2,
+                )
+    # r_net_source in ("return", "disclosure") → 独立路径，跳过自证检测
+
+    # ---- 门的最终判定：可信且通过才算通过 -------------------------------
+    if self_provision:
+        gate_status = "self_provision"
+        passed = False
+    elif not residual_ok:
+        gate_status = "residual_exceeded"
+        passed = False
+    else:
+        gate_status = "ok"
+        passed = True
 
     def pct(x: Decimal) -> float | None:
         return float(x / a0) if a0 else None
@@ -260,6 +294,11 @@ def waterfall(
     )
 
     if raise_on_fail and not passed:
+        if gate_status == "self_provision":
+            raise AttributionResidualError(
+                "归因门不可信：R_net 来自 A 式反解，残差按定义恒为 0（B02）。"
+                "请改用 waterfall_independent() 或先做 reconcile_r_net()。"
+            )
         raise AttributionResidualError(
             f"归因残差 {residual}（{residual_pct:.6%}）超阈值 0.5%"
         )
@@ -271,6 +310,7 @@ def waterfall(
         residual=residual,
         residual_pct=residual_pct,
         passed=passed,
+        gate_status=gate_status,
     )
 
 
@@ -303,7 +343,14 @@ def waterfall_independent(
     """
     rn = r_net_from_return(a_start, period_return, average_aum=average_aum)
     return waterfall(
-        a_start, net_sub, rn, div_cash, a_end, other, raise_on_fail=raise_on_fail
+        a_start,
+        net_sub,
+        rn,
+        div_cash,
+        a_end,
+        other,
+        raise_on_fail=raise_on_fail,
+        r_net_source="return",  # 独立路径：残差门有效，不得被判为自证
     )
 
 

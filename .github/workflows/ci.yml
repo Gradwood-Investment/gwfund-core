@@ -1,0 +1,73 @@
+﻿name: ci
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install test deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov
+
+      - name: Run tests (with coverage gate 80%)
+        run: python -m pytest -q --cov=gwfund_core --cov-report=term --cov-fail-under=80
+
+      - name: Golden vectors (four-end consistency)
+        run: python scripts/check_vectors.py
+
+      - name: Indicator coverage matrix
+        run: python scripts/check_coverage.py
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan for secrets
+        run: |
+          echo "扫描硬编码密钥 / 私钥文件..."
+          fail=0
+          # 私钥文件
+          if git ls-files | grep -Ei '\.(key|pem|p12|pfx)$'; then
+            echo "::error::仓库中出现私钥文件"; fail=1
+          fi
+          # 常见密钥字面量
+          if grep -rInE '(api[_-]?key|secret|token|password)\s*[:=]\s*["\x27][A-Za-z0-9_\-]{16,}' \
+               --include='*.py' --include='*.toml' --include='*.json' --include='*.md' . ; then
+            echo "::error::疑似硬编码密钥"; fail=1
+          fi
+          if [ "$fail" -eq 0 ]; then echo "未发现密钥泄露"; fi
+          exit $fail
+
+  clean-clone:
+    # 《裁定书四》P0-3 验收判据：干净 clone -> 一条命令 -> 全绿
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: One-command check
+        run: |
+          python -m pip install -q pytest pytest-cov
+          python -m pytest -q \
+            && python scripts/check_vectors.py \
+            && python scripts/check_coverage.py \
+            && echo "干净 clone 一条命令全绿"

@@ -1,0 +1,2439 @@
+{
+  "schema_version": "1.1.0",
+  "generated_at": "2026-11-21T18:40:00+08:00",
+  "core_version": "1.0.0rc1",
+  "spec_version": "附件A v1.1（含 SPEC-GAP-01~05）/ SOW v1.1",
+  "tolerance": 1e-06,
+  "purpose": "四端一致性对拍（SOW §7.3 C12 / 附件C §13）；差异 > tolerance 阻断 CI",
+  "tier_legend": {
+    "1": "手算基线——期望值来自附件A 手算样例或独立解析解，不来自引擎",
+    "2": "回归基线——期望值在本版本由引擎冻结，用于防止无意行为漂移，非独立真值"
+  },
+  "counts": {
+    "tier1": 4,
+    "tier2": 63,
+    "total": 67,
+    "target_M1": 50
+  },
+  "vectors": [
+    {
+      "id": "GV-01",
+      "tier": 1,
+      "name": "附件A §4.5 三期手算样例",
+      "source": "《附件A》§4.5 式(5.1)(5.2)(5.3)",
+      "module": "returns",
+      "inputs": {
+        "navs": [
+          1.0,
+          1.1,
+          1.045,
+          1.045
+        ],
+        "cashflows": [
+          -1000000,
+          -500000,
+          0,
+          1520000
+        ],
+        "times": [
+          0,
+          1,
+          2,
+          3
+        ]
+      },
+      "expected": {
+        "twr": 0.045,
+        "mwr": 0.004978283759868921,
+        "mwr_pct": 0.4978283759868921,
+        "gap_pct": 4.002171624013101,
+        "gap_ann_pp": 17.2456
+      },
+      "notes": "DEV-001 已裁定：附件A 按真值修订为 0.497828% / 4.002172pct / 2.0062%；同时断言 NPV(mwr)=0 作为不依赖文档的自洽校验",
+      "tolerance_overrides": {
+        "gap_ann_pp": 0.0001
+      }
+    },
+    {
+      "id": "GV-02",
+      "tier": 1,
+      "name": "决策 D10 MWR 黄金用例",
+      "source": "决策记录 D10（秉枢复算：840y²−900y−100=0）",
+      "module": "returns",
+      "inputs": {
+        "cashflows": [
+          -100.0,
+          -900.0,
+          840.0
+        ],
+        "times": [
+          0.0,
+          0.5,
+          1.0
+        ]
+      },
+      "expected": {
+        "twr": 0.2,
+        "mwr": -0.273125287861484,
+        "gap_pct": 47.3125287861484,
+        "p_inv": -160.0
+      },
+      "notes": "D10 定：MWR=−27.31%、缺口=+47.31pct，容差 ±0.1pct"
+    },
+    {
+      "id": "GV-03",
+      "tier": 1,
+      "name": "附件A §3.5 费用计提（100 亿 / 1.20% / 0.20%）",
+      "source": "《附件A》§3.5",
+      "module": "fees",
+      "inputs": {
+        "a_prev": 10000000000,
+        "rate_mgmt_pct": "1.20",
+        "rate_custody_pct": "0.20",
+        "rate_sales_pct": 0,
+        "date_non_leap": "2026-06-01",
+        "date_leap": "2024-06-03"
+      },
+      "expected": {
+        "mgmt_2026": 328767.12,
+        "custody_2026": 54794.52,
+        "total_2026": 383561.64,
+        "mgmt_2024_leap": 327868.85
+      },
+      "notes": "分母用 A_{t-1}；闰年 366；年化费率线性除（附件A §3.1 三条细节）"
+    },
+    {
+      "id": "GV-04",
+      "tier": 1,
+      "name": "附件A §5.3 规模归因（000001 2026Q2）",
+      "source": "《附件A》§5.3 实测数据",
+      "module": "attribution",
+      "inputs": {
+        "a_start": 2644000000.0,
+        "a_end": 3938000000.0000005,
+        "net_sub": -248410000.00000003,
+        "div_cash": 0.0
+      },
+      "expected": {
+        "r_net": 1542410000.0,
+        "residual": 0.0,
+        "residual_pct": 0.0
+      },
+      "notes": "瀑布六段，残差必须 0.00%（<0.5% 门禁）"
+    },
+    {
+      "id": "GV-05",
+      "tier": 2,
+      "name": "年化与 T9「不足 1 年不年化」",
+      "source": "《附件A》§5.3 M203 + 陷阱 T9",
+      "module": "returns",
+      "inputs": {
+        "cases": [
+          {
+            "r": 0.1,
+            "days": 30
+          },
+          {
+            "r": 0.1,
+            "days": 365
+          },
+          {
+            "r": 0.21,
+            "days": 730
+          }
+        ]
+      },
+      "expected": {
+        "annualized_30": false,
+        "value_30": null,
+        "value_365": 0.10000000000000009,
+        "value_730": 0.10000000000000009
+      },
+      "notes": "30 天涨 10% 不得报出 +1000% 年化；满 1 年才年化"
+    },
+    {
+      "id": "GV-06",
+      "tier": 2,
+      "name": "闰年日费用比 = 365/366",
+      "source": "《附件A》§3.1 细节 2",
+      "module": "fees",
+      "inputs": {
+        "a_prev": 1000000000,
+        "rate_pct": "1.20",
+        "non_leap": "2026-06-01",
+        "leap": "2024-06-03"
+      },
+      "expected": {
+        "ratio_non_leap_over_leap": 1.0027395096027711
+      },
+      "notes": "闰年分母变大 → 单日费用变小；年度合计不变"
+    },
+    {
+      "id": "GV-07",
+      "tier": 2,
+      "name": "混频方案 3：季度申赎明细 + 均匀权重",
+      "source": "《附件A》§6.2 式(8.4)(8.5)，决策 D20 默认均匀",
+      "module": "mixing",
+      "inputs": {
+        "sub_shares": 1000000.0,
+        "red_shares": 400000.0,
+        "navs": [
+          1.0,
+          1.01,
+          1.02,
+          1.03,
+          1.04,
+          1.05,
+          1.06,
+          1.07,
+          1.08,
+          1.09
+        ],
+        "weight_scheme": "uniform"
+      },
+      "expected": {
+        "net_sub": 627000.0,
+        "mean_nav": 1.0450000000000002
+      },
+      "notes": "NetSub 为费前金额；申赎费一律不得冲减（陷阱 T3）"
+    },
+    {
+      "id": "GV-08",
+      "tier": 2,
+      "name": "追高资金：000001 观测期无追高（V10）",
+      "source": "《附件A》§7.2 + §11 V10",
+      "module": "chase",
+      "inputs": {
+        "net_subs_yi": [
+          -1.9,
+          -0.91,
+          -1.19,
+          -1.87
+        ],
+        "theta": 0.8
+      },
+      "expected": {
+        "chase_amount": 0.0,
+        "has_chasing": false,
+        "chase_ratio": null
+      },
+      "notes": "必须能输出「无追高资金」，不得强行拟合"
+    },
+    {
+      "id": "GV-09",
+      "tier": 2,
+      "name": "追高资金：高位大额申购应被识别",
+      "source": "《附件A》§7.2 正向样例要求",
+      "module": "chase",
+      "inputs": {
+        "net_subs_yi": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          5.0
+        ],
+        "navs": [
+          1.0,
+          1.1,
+          1.2,
+          1.3,
+          1.4,
+          1.5
+        ],
+        "theta": 0.8
+      },
+      "expected": {
+        "chase_amount": 500000000.0,
+        "chase_ratio": 1.0,
+        "has_chasing": true
+      },
+      "notes": "最高位 5 亿净申购，占比 100%"
+    },
+    {
+      "id": "GV-10",
+      "tier": 2,
+      "name": "规模分档浮动管理费（150 亿：100 亿@1.20% + 50 亿@0.60%）",
+      "source": "《附件A》§3.2 浮动费率·规模分档型",
+      "module": "fees",
+      "inputs": {
+        "a_prev": 15000000000.0,
+        "tier": [
+          [
+            "1e10",
+            "1.20"
+          ],
+          [
+            null,
+            "0.60"
+          ]
+        ],
+        "date": "2026-06-01"
+      },
+      "expected": {
+        "daily_fee": 410958.9
+      },
+      "notes": "浮动费率必须逐日模拟，不得用年化平均费率近似"
+    },
+    {
+      "id": "GV-11",
+      "tier": 2,
+      "name": "最大回撤 M205（先峰后谷）",
+      "source": "《附件A》§5.3 M205",
+      "module": "metrics",
+      "inputs": {
+        "equity_curve": [
+          1.0,
+          1.2,
+          0.9,
+          1.1
+        ]
+      },
+      "expected": {
+        "mdd": 0.25,
+        "peak_index": 1,
+        "trough_index": 2
+      },
+      "notes": "净值 1.2 → 0.9，回撤 1 − 0.9/1.2 = 25%"
+    },
+    {
+      "id": "GV-12",
+      "tier": 2,
+      "name": "持有体验分布 M307（单调上涨 → 胜率 100%）",
+      "source": "《附件A》§5.3 M307",
+      "module": "metrics",
+      "inputs": {
+        "navs": [
+          1.0,
+          1.001,
+          1.002,
+          1.003,
+          1.004,
+          1.005,
+          1.006,
+          1.007,
+          1.008,
+          1.009,
+          1.01,
+          1.011,
+          1.012,
+          1.013,
+          1.014,
+          1.015,
+          1.016,
+          1.017,
+          1.018,
+          1.019,
+          1.02,
+          1.021,
+          1.022,
+          1.023,
+          1.024,
+          1.025,
+          1.026,
+          1.027,
+          1.028,
+          1.029,
+          1.03,
+          1.031,
+          1.032,
+          1.033,
+          1.034,
+          1.035,
+          1.036,
+          1.037,
+          1.038,
+          1.039,
+          1.04,
+          1.041,
+          1.042,
+          1.043,
+          1.044,
+          1.045,
+          1.046,
+          1.047,
+          1.048,
+          1.049,
+          1.05,
+          1.051,
+          1.052,
+          1.053,
+          1.054,
+          1.055,
+          1.056,
+          1.057,
+          1.058,
+          1.059,
+          1.06,
+          1.061,
+          1.062,
+          1.063,
+          1.064,
+          1.065,
+          1.066,
+          1.067,
+          1.068,
+          1.069,
+          1.07,
+          1.071,
+          1.072,
+          1.073,
+          1.074,
+          1.075,
+          1.076,
+          1.077,
+          1.078,
+          1.079,
+          1.08,
+          1.081,
+          1.082,
+          1.083,
+          1.084,
+          1.085,
+          1.086,
+          1.087,
+          1.088,
+          1.089,
+          1.09,
+          1.091,
+          1.092,
+          1.093,
+          1.094,
+          1.095,
+          1.096,
+          1.097,
+          1.098,
+          1.099,
+          1.1,
+          1.101,
+          1.102,
+          1.103,
+          1.104,
+          1.105,
+          1.106,
+          1.107,
+          1.108,
+          1.109,
+          1.11,
+          1.111,
+          1.112,
+          1.113,
+          1.114,
+          1.115,
+          1.116,
+          1.117,
+          1.118,
+          1.119,
+          1.12,
+          1.121,
+          1.1219999999999999,
+          1.123,
+          1.124,
+          1.125,
+          1.126,
+          1.127,
+          1.1280000000000001,
+          1.129,
+          1.13,
+          1.131,
+          1.1320000000000001,
+          1.133,
+          1.134,
+          1.135,
+          1.1360000000000001,
+          1.137,
+          1.138,
+          1.139,
+          1.1400000000000001,
+          1.141,
+          1.142,
+          1.143,
+          1.1440000000000001,
+          1.145,
+          1.146,
+          1.147,
+          1.148,
+          1.149,
+          1.15,
+          1.151,
+          1.152,
+          1.153,
+          1.154,
+          1.155,
+          1.156,
+          1.157,
+          1.158,
+          1.159,
+          1.16,
+          1.161,
+          1.162,
+          1.163,
+          1.164,
+          1.165,
+          1.166,
+          1.167,
+          1.168,
+          1.169,
+          1.17,
+          1.171,
+          1.172,
+          1.173,
+          1.174,
+          1.175,
+          1.176,
+          1.177,
+          1.178,
+          1.179,
+          1.18,
+          1.181,
+          1.182,
+          1.183,
+          1.184,
+          1.185,
+          1.186,
+          1.187,
+          1.188,
+          1.189,
+          1.19,
+          1.191,
+          1.192,
+          1.193,
+          1.194,
+          1.195,
+          1.196,
+          1.197,
+          1.198,
+          1.199,
+          1.2,
+          1.201,
+          1.202,
+          1.203,
+          1.204,
+          1.205,
+          1.206,
+          1.207,
+          1.208,
+          1.209,
+          1.21,
+          1.211,
+          1.212,
+          1.213,
+          1.214,
+          1.215,
+          1.216,
+          1.217,
+          1.218,
+          1.219,
+          1.22,
+          1.221,
+          1.222,
+          1.223,
+          1.224,
+          1.225,
+          1.226,
+          1.227,
+          1.228,
+          1.229,
+          1.23,
+          1.231,
+          1.232,
+          1.233,
+          1.234,
+          1.235,
+          1.236,
+          1.237,
+          1.238,
+          1.239,
+          1.24,
+          1.241,
+          1.242,
+          1.2429999999999999,
+          1.244,
+          1.245,
+          1.246,
+          1.2469999999999999,
+          1.248,
+          1.249,
+          1.25,
+          1.251,
+          1.252,
+          1.2530000000000001,
+          1.254,
+          1.255,
+          1.256,
+          1.2570000000000001,
+          1.258,
+          1.259,
+          1.26,
+          1.2610000000000001,
+          1.262,
+          1.263,
+          1.264,
+          1.2650000000000001,
+          1.266,
+          1.267,
+          1.268,
+          1.2690000000000001,
+          1.27,
+          1.271,
+          1.272,
+          1.2730000000000001,
+          1.274,
+          1.275,
+          1.276,
+          1.2770000000000001,
+          1.278,
+          1.279,
+          1.28,
+          1.2810000000000001,
+          1.282,
+          1.283,
+          1.284,
+          1.2850000000000001,
+          1.286,
+          1.287,
+          1.288,
+          1.289,
+          1.29,
+          1.291,
+          1.292,
+          1.293,
+          1.294,
+          1.295,
+          1.296,
+          1.297,
+          1.298,
+          1.299
+        ],
+        "window": 250
+      },
+      "expected": {
+        "samples": 50,
+        "win_rate": 1.0
+      },
+      "notes": "「随便哪天买、拿 250 个交易日」的胜率——与净值收益率是两回事"
+    },
+    {
+      "id": "GV-13",
+      "tier": 2,
+      "name": "单期净收益（含分红）",
+      "source": "式(1.2)",
+      "module": "returns",
+      "call": {
+        "fn": "daily_return",
+        "args": [
+          1.2,
+          1.18,
+          0.03
+        ],
+        "kwargs": {},
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": 0.008333333333333304
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-14",
+      "tier": 2,
+      "name": "单期净收益：分母为 0 返回 None",
+      "source": "式(1.2)+§5.8",
+      "module": "returns",
+      "call": {
+        "fn": "daily_return",
+        "args": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "kwargs": {},
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": null
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-15",
+      "tier": 2,
+      "name": "复权净值序列（1 次分红）",
+      "source": "M103 / 决策 D07",
+      "module": "returns",
+      "call": {
+        "fn": "adjusted_nav_series",
+        "args": [
+          [
+            1.0,
+            0.95,
+            1.0,
+            1.05
+          ],
+          [
+            0.0,
+            0.05,
+            0.0,
+            0.0
+          ]
+        ],
+        "kwargs": {},
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": [
+          1.0,
+          1.0,
+          1.0526315789473684,
+          1.1052631578947367
+        ]
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-16",
+      "tier": 2,
+      "name": "分红还原：Δacc − Δunit",
+      "source": "§8.2 步3",
+      "module": "returns",
+      "call": {
+        "fn": "derive_dividend_series",
+        "args": [
+          [
+            1.0,
+            1.0,
+            1.05,
+            1.1
+          ],
+          [
+            1.0,
+            0.95,
+            1.0,
+            1.05
+          ]
+        ],
+        "kwargs": {},
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": [
+          0.0,
+          0.050000000000000044,
+          0.0,
+          0.0
+        ]
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-17",
+      "tier": 2,
+      "name": "年化：满 365 天才年化",
+      "source": "M203 / T9",
+      "module": "returns",
+      "call": {
+        "fn": "annualize",
+        "args": [
+          0.21,
+          730
+        ],
+        "kwargs": {},
+        "extract": {
+          "value": "value",
+          "annualized": "annualized"
+        }
+      },
+      "expected": {
+        "value": 0.10000000000000009,
+        "annualized": true
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-18",
+      "tier": 2,
+      "name": "年化：不足 1 年不年化",
+      "source": "T9",
+      "module": "returns",
+      "call": {
+        "fn": "annualize",
+        "args": [
+          0.1,
+          200
+        ],
+        "kwargs": {},
+        "extract": {
+          "value": "value",
+          "annualized": "annualized"
+        }
+      },
+      "expected": {
+        "value": null,
+        "annualized": false
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-19",
+      "tier": 2,
+      "name": "IRR：等间隔三期",
+      "source": "式(5.2)",
+      "module": "returns",
+      "call": {
+        "fn": "irr",
+        "args": [
+          [
+            -1000000,
+            -500000,
+            0,
+            1520000
+          ]
+        ],
+        "kwargs": {},
+        "extract": {
+          "value": "value",
+          "multi_root": "multi_root"
+        }
+      },
+      "expected": {
+        "value": 0.004978283759868921,
+        "multi_root": false
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-20",
+      "tier": 2,
+      "name": "IRR：决策 D10 半年期现金流",
+      "source": "D10 / 式(5.2)",
+      "module": "returns",
+      "call": {
+        "fn": "irr",
+        "args": [
+          [
+            -100.0,
+            -900.0,
+            840.0
+          ],
+          [
+            0.0,
+            0.5,
+            1.0
+          ]
+        ],
+        "kwargs": {},
+        "extract": {
+          "value": "value",
+          "multi_root": "multi_root"
+        }
+      },
+      "expected": {
+        "value": -0.27312528786148826,
+        "multi_root": false
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-21",
+      "tier": 2,
+      "name": "单日管理费（非闰年）",
+      "source": "式(3.1)",
+      "module": "fees",
+      "call": {
+        "fn": "daily_fee",
+        "args": [
+          10000000000,
+          "1.20",
+          {
+            "__date__": "2026-06-01"
+          }
+        ],
+        "kwargs": {},
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": 328767.12
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-22",
+      "tier": 2,
+      "name": "单日托管费（闰年 366）",
+      "source": "式(3.2)+§3.1 细节2",
+      "module": "fees",
+      "call": {
+        "fn": "daily_fee",
+        "args": [
+          10000000000,
+          "0.20",
+          {
+            "__date__": "2024-06-03"
+          }
+        ],
+        "kwargs": {},
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": 54644.81
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-23",
+      "tier": 2,
+      "name": "三类费用单日合计",
+      "source": "式(3.1)-(3.3)",
+      "module": "fees",
+      "call": {
+        "fn": "daily_accrual",
+        "args": [
+          1000000000,
+          {
+            "__date__": "2026-06-01"
+          },
+          "1.20",
+          "0.20",
+          "0.40"
+        ],
+        "kwargs": {},
+        "extract": {
+          "total": "total",
+          "mgmt": "mgmt"
+        }
+      },
+      "expected": {
+        "total": 49315.06,
+        "mgmt": 32876.71
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-24",
+      "tier": 2,
+      "name": "赎回费分档：6 天",
+      "source": "§3.2 闭区间",
+      "module": "fees",
+      "call": {
+        "fn": "lookup_tier_rate",
+        "args": [
+          [
+            {
+              "holding_days": [
+                0,
+                6
+              ],
+              "rate_pct": 1.5
+            },
+            {
+              "holding_days": [
+                7,
+                364
+              ],
+              "rate_pct": 0.5
+            },
+            {
+              "holding_days": [
+                365,
+                729
+              ],
+              "rate_pct": 0.25
+            },
+            {
+              "holding_days": [
+                730,
+                null
+              ],
+              "rate_pct": 0.0
+            }
+          ],
+          6
+        ],
+        "kwargs": {},
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": 1.5
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-25",
+      "tier": 2,
+      "name": "赎回费分档：730 天",
+      "source": "§3.2 闭区间",
+      "module": "fees",
+      "call": {
+        "fn": "lookup_tier_rate",
+        "args": [
+          [
+            {
+              "holding_days": [
+                0,
+                6
+              ],
+              "rate_pct": 1.5
+            },
+            {
+              "holding_days": [
+                7,
+                364
+              ],
+              "rate_pct": 0.5
+            },
+            {
+              "holding_days": [
+                365,
+                729
+              ],
+              "rate_pct": 0.25
+            },
+            {
+              "holding_days": [
+                730,
+                null
+              ],
+              "rate_pct": 0.0
+            }
+          ],
+          730
+        ],
+        "kwargs": {},
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": 0.0
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-26",
+      "tier": 2,
+      "name": "业绩报酬：涨 3% 未达 5% 门槛",
+      "source": "SPEC-GAP-01",
+      "module": "fees",
+      "call": {
+        "fn": "performance_fee_daily",
+        "args": [
+          10000000000,
+          1.03,
+          1.0,
+          0.05,
+          20,
+          {
+            "__date__": "2026-06-01"
+          }
+        ],
+        "kwargs": {},
+        "extract": {
+          "fee": "0",
+          "hwm": "1"
+        }
+      },
+      "expected": {
+        "fee": 0.0,
+        "hwm": 1.0
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-27",
+      "tier": 2,
+      "name": "业绩报酬：涨 8% 达门槛",
+      "source": "SPEC-GAP-01",
+      "module": "fees",
+      "call": {
+        "fn": "performance_fee_daily",
+        "args": [
+          10000000000,
+          1.08,
+          1.0,
+          0.05,
+          20,
+          {
+            "__date__": "2026-06-01"
+          }
+        ],
+        "kwargs": {},
+        "extract": {
+          "fee": "0",
+          "hwm": "1"
+        }
+      },
+      "expected": {
+        "fee": 60000000.0,
+        "hwm": 1.08
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-28",
+      "tier": 2,
+      "name": "冲击成本分档：50 亿",
+      "source": "§3.3 分档表",
+      "module": "fees",
+      "call": {
+        "fn": "impact_cost_pct",
+        "args": [
+          5000000000
+        ],
+        "kwargs": {},
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": 0.2
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-29",
+      "tier": 2,
+      "name": "买入成本率（不含印花税）",
+      "source": "SPEC-GAP-03",
+      "module": "fees",
+      "call": {
+        "fn": "trade_cost_rate_pct",
+        "args": [
+          1000000000
+        ],
+        "kwargs": {
+          "side": "buy"
+        },
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": 0.181
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-30",
+      "tier": 2,
+      "name": "卖出成本率（含印花税）",
+      "source": "SPEC-GAP-03",
+      "module": "fees",
+      "call": {
+        "fn": "trade_cost_rate_pct",
+        "args": [
+          1000000000
+        ],
+        "kwargs": {
+          "side": "sell"
+        },
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": 0.231
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-31",
+      "tier": 2,
+      "name": "年报反算隐含成本率",
+      "source": "式(3.7)",
+      "module": "fees",
+      "call": {
+        "fn": "implied_cost_rate",
+        "args": [
+          {
+            "__dec__": "3000000"
+          },
+          {
+            "__dec__": "2000000000"
+          }
+        ],
+        "kwargs": {},
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": 0.0015
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-32",
+      "tier": 2,
+      "name": "基民净盈亏 P_inv",
+      "source": "式(4.1)",
+      "module": "identities",
+      "call": {
+        "fn": "p_inv",
+        "args": [
+          840.0,
+          0.0,
+          100.0,
+          900.0
+        ],
+        "kwargs": {},
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": -160.0
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-33",
+      "tier": 2,
+      "name": "净申购金额（费前）",
+      "source": "式(4.2a)",
+      "module": "identities",
+      "call": {
+        "fn": "net_sub_amount",
+        "args": [
+          1000000.0,
+          400000.0,
+          1.1,
+          1.05
+        ],
+        "kwargs": {},
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": 680000.0
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-34",
+      "tier": 2,
+      "name": "恒等式 A 同频容差内",
+      "source": "式(A)/T-2",
+      "module": "identities",
+      "call": {
+        "fn": "check_identity_a",
+        "args": [
+          1000.0,
+          1100.0,
+          100.005,
+          0.0,
+          0.0
+        ],
+        "kwargs": {},
+        "extract": {
+          "passed": "passed",
+          "residual": "residual"
+        }
+      },
+      "expected": {
+        "passed": true,
+        "residual": -0.01
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-35",
+      "tier": 2,
+      "name": "恒等式 A 同频超容差",
+      "source": "式(A)/T-2",
+      "module": "identities",
+      "call": {
+        "fn": "check_identity_a",
+        "args": [
+          1000.0,
+          1100.0,
+          100.02,
+          0.0,
+          0.0
+        ],
+        "kwargs": {},
+        "extract": {
+          "passed": "passed"
+        }
+      },
+      "expected": {
+        "passed": false
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-36",
+      "tier": 2,
+      "name": "恒等式 B 独立构造",
+      "source": "式(B)",
+      "module": "identities",
+      "call": {
+        "fn": "check_identity_b",
+        "args": [
+          1000.0,
+          1200.0,
+          50.0,
+          100.0,
+          150.0
+        ],
+        "kwargs": {},
+        "extract": {
+          "passed": "passed"
+        }
+      },
+      "expected": {
+        "passed": true
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-37",
+      "tier": 2,
+      "name": "恒等式 C' 含 Other",
+      "source": "式(C')",
+      "module": "identities",
+      "call": {
+        "fn": "check_identity_c",
+        "args": [
+          980.0,
+          850.0,
+          150.0,
+          20.0
+        ],
+        "kwargs": {},
+        "extract": {
+          "passed": "passed",
+          "residual": "residual"
+        }
+      },
+      "expected": {
+        "passed": true,
+        "residual": 0.0
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-38",
+      "tier": 2,
+      "name": "Other 归一化残差",
+      "source": "式(4.5)",
+      "module": "identities",
+      "call": {
+        "fn": "unexplained_residual_pct",
+        "args": [
+          40000.0,
+          10000000.0,
+          10000000.0
+        ],
+        "kwargs": {},
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": 0.004
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-39",
+      "tier": 2,
+      "name": "Other 疑似科目归错",
+      "source": "§4.5 量级预期",
+      "module": "identities",
+      "call": {
+        "fn": "is_other_suspect",
+        "args": [
+          20000.0,
+          1000000.0,
+          1000000.0
+        ],
+        "kwargs": {},
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": true
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-40",
+      "tier": 2,
+      "name": "份额归因：红利再投不产生假净申购",
+      "source": "式(6.3)/T1",
+      "module": "attribution",
+      "call": {
+        "fn": "share_attribution",
+        "args": [
+          1000000.0,
+          1100000.0,
+          0.0,
+          100000.0
+        ],
+        "kwargs": {},
+        "extract": {
+          "passed": "passed",
+          "residual": "residual"
+        }
+      },
+      "expected": {
+        "passed": true,
+        "residual": 0.0
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-41",
+      "tier": 2,
+      "name": "收益分解：div_effect 取负号",
+      "source": "式(6.4)/SPEC-GAP-02",
+      "module": "attribution",
+      "call": {
+        "fn": "return_decomposition",
+        "args": [
+          1000.0,
+          100.0,
+          200.0,
+          50.0
+        ],
+        "kwargs": {},
+        "extract": {
+          "div_effect": "div_effect",
+          "delta_a_ratio": "delta_a_ratio",
+          "closure_passed": "closure_passed"
+        }
+      },
+      "expected": {
+        "div_effect": -0.05,
+        "delta_a_ratio": 0.25000000000000006,
+        "closure_passed": true
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-42",
+      "tier": 2,
+      "name": "独立路径 R_net（平均 AUM）",
+      "source": "§5.1 第③段",
+      "module": "attribution",
+      "call": {
+        "fn": "r_net_from_return",
+        "args": [
+          1000.0,
+          0.1
+        ],
+        "kwargs": {
+          "average_aum": 2000.0
+        },
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": 200.0
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-43",
+      "tier": 2,
+      "name": "披露路径 R_net",
+      "source": "式(C)",
+      "module": "attribution",
+      "call": {
+        "fn": "r_net_from_disclosure",
+        "args": [
+          1000.0,
+          150.0
+        ],
+        "kwargs": {},
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": 850.0
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-44",
+      "tier": 2,
+      "name": "阶梯法：首个季末前为 None",
+      "source": "式(8.1)",
+      "module": "mixing",
+      "call": {
+        "fn": "step_shares",
+        "args": [
+          [
+            {
+              "__date__": "2025-01-15"
+            }
+          ],
+          [
+            {
+              "__date__": "2025-03-31"
+            }
+          ],
+          [
+            100.0
+          ]
+        ],
+        "kwargs": {},
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": [
+          null
+        ]
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-45",
+      "tier": 2,
+      "name": "线性插值：两季末中点",
+      "source": "式(8.3)",
+      "module": "mixing",
+      "call": {
+        "fn": "linear_shares",
+        "args": [
+          [
+            {
+              "__date__": "2025-05-15"
+            }
+          ],
+          [
+            {
+              "__date__": "2025-03-31"
+            },
+            {
+              "__date__": "2025-06-30"
+            }
+          ],
+          [
+            100.0,
+            110.0
+          ]
+        ],
+        "kwargs": {},
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": [
+          104.94505494505495
+        ]
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-46",
+      "tier": 2,
+      "name": "方案选择：有申赎明细 → 方案3",
+      "source": "§6.3 降级判据",
+      "module": "mixing",
+      "call": {
+        "fn": "choose_method",
+        "args": [],
+        "kwargs": {
+          "has_sub_red": true,
+          "has_start_end_share": true,
+          "has_end_share": true
+        },
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": "quarterly_detail"
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-47",
+      "tier": 2,
+      "name": "精度等级：日频 AUM 最高 B",
+      "source": "§6.4 规则1",
+      "module": "mixing",
+      "call": {
+        "fn": "precision_for",
+        "args": [
+          "quarterly_detail"
+        ],
+        "kwargs": {
+          "is_daily_aum": true
+        },
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": "B"
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-48",
+      "tier": 2,
+      "name": "AUM 误差上界（§6.5 样例）",
+      "source": "式(8.7)",
+      "module": "mixing",
+      "call": {
+        "fn": "aum_error_bound",
+        "args": [
+          -187000000.0,
+          1.63674,
+          1.02006
+        ],
+        "kwargs": {},
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": 115319160.0
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-49",
+      "tier": 2,
+      "name": "净值历史分位序列",
+      "source": "式(9.2)",
+      "module": "chase",
+      "call": {
+        "fn": "percentile_series",
+        "args": [
+          [
+            1.0,
+            1.5,
+            1.2,
+            1.6
+          ]
+        ],
+        "kwargs": {},
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": [
+          1.0,
+          1.0,
+          0.6666666666666666,
+          1.0
+        ]
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-50",
+      "tier": 2,
+      "name": "追高金额（高位净申购）",
+      "source": "式(9.1)",
+      "module": "chase",
+      "call": {
+        "fn": "chase_amount",
+        "args": [
+          [
+            0.0,
+            0.0,
+            500000000.0
+          ],
+          [
+            0.5,
+            0.9,
+            1.0
+          ]
+        ],
+        "kwargs": {
+          "theta": 0.8
+        },
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": 500000000.0
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-51",
+      "tier": 2,
+      "name": "追高占比（无申购 → None）",
+      "source": "式(9.4)+§5.8",
+      "module": "chase",
+      "call": {
+        "fn": "chase_ratio",
+        "args": [
+          0.0,
+          0.0
+        ],
+        "kwargs": {},
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": null
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-52",
+      "tier": 2,
+      "name": "追高亏损只计亏损部分",
+      "source": "式(9.5)",
+      "module": "chase",
+      "call": {
+        "fn": "chase_loss",
+        "args": [
+          [
+            100000000.0,
+            100000000.0
+          ],
+          [
+            0.9,
+            0.9
+          ],
+          [
+            1.0,
+            1.0
+          ],
+          0.8
+        ],
+        "kwargs": {},
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": 39999999.99999999
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-53",
+      "tier": 2,
+      "name": "监管口径方向相反 → BLOCK",
+      "source": "式(9.6)",
+      "module": "chase",
+      "call": {
+        "fn": "caliber_check",
+        "args": [
+          0.75,
+          0.2
+        ],
+        "kwargs": {},
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": "CALIBER_MISMATCH_BLOCK"
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-54",
+      "tier": 2,
+      "name": "年化波动率（常收益 → 0）",
+      "source": "M204",
+      "module": "metrics",
+      "call": {
+        "fn": "annualized_volatility",
+        "args": [
+          [
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01,
+            0.01
+          ]
+        ],
+        "kwargs": {},
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": 0.0
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-55",
+      "tier": 2,
+      "name": "最大回撤：峰谷定位",
+      "source": "M205",
+      "module": "metrics",
+      "call": {
+        "fn": "max_drawdown",
+        "args": [
+          [
+            1.0,
+            1.2,
+            0.9,
+            1.1
+          ]
+        ],
+        "kwargs": {},
+        "extract": {
+          "mdd": "mdd",
+          "peak_index": "peak_index",
+          "trough_index": "trough_index"
+        }
+      },
+      "expected": {
+        "mdd": 0.25,
+        "peak_index": 1,
+        "trough_index": 2
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-56",
+      "tier": 2,
+      "name": "下行波动（全部样本为分母）",
+      "source": "M207 定义",
+      "module": "metrics",
+      "call": {
+        "fn": "downside_deviation",
+        "args": [
+          [
+            0.01,
+            0.01,
+            -0.02,
+            -0.02
+          ]
+        ],
+        "kwargs": {
+          "periods_per_year": 1
+        },
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": 0.01414213562373095
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-57",
+      "tier": 2,
+      "name": "卡玛比率",
+      "source": "M208",
+      "module": "metrics",
+      "call": {
+        "fn": "calmar_ratio",
+        "args": [
+          0.2,
+          0.1
+        ],
+        "kwargs": {},
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": 2.0
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-58",
+      "tier": 2,
+      "name": "每元管理费对应基民盈亏",
+      "source": "M306",
+      "module": "metrics",
+      "call": {
+        "fn": "fee_per_yuan_pnl",
+        "args": [
+          -160000000,
+          18420000
+        ],
+        "kwargs": {},
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": -8.686210640608035
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-59",
+      "tier": 2,
+      "name": "持有体验分布（单调涨）",
+      "source": "M307",
+      "module": "metrics",
+      "call": {
+        "fn": "holding_experience",
+        "args": [
+          [
+            1.0,
+            1.001,
+            1.002,
+            1.003,
+            1.004,
+            1.005,
+            1.006,
+            1.007,
+            1.008,
+            1.009,
+            1.01,
+            1.011,
+            1.012,
+            1.013,
+            1.014,
+            1.015,
+            1.016,
+            1.017,
+            1.018,
+            1.019,
+            1.02,
+            1.021,
+            1.022,
+            1.023,
+            1.024,
+            1.025,
+            1.026,
+            1.027,
+            1.028,
+            1.029,
+            1.03,
+            1.031,
+            1.032,
+            1.033,
+            1.034,
+            1.035,
+            1.036,
+            1.037,
+            1.038,
+            1.039,
+            1.04,
+            1.041,
+            1.042,
+            1.043,
+            1.044,
+            1.045,
+            1.046,
+            1.047,
+            1.048,
+            1.049,
+            1.05,
+            1.051,
+            1.052,
+            1.053,
+            1.054,
+            1.055,
+            1.056,
+            1.057,
+            1.058,
+            1.059,
+            1.06,
+            1.061,
+            1.062,
+            1.063,
+            1.064,
+            1.065,
+            1.066,
+            1.067,
+            1.068,
+            1.069,
+            1.07,
+            1.071,
+            1.072,
+            1.073,
+            1.074,
+            1.075,
+            1.076,
+            1.077,
+            1.078,
+            1.079,
+            1.08,
+            1.081,
+            1.082,
+            1.083,
+            1.084,
+            1.085,
+            1.086,
+            1.087,
+            1.088,
+            1.089,
+            1.09,
+            1.091,
+            1.092,
+            1.093,
+            1.094,
+            1.095,
+            1.096,
+            1.097,
+            1.098,
+            1.099,
+            1.1,
+            1.101,
+            1.102,
+            1.103,
+            1.104,
+            1.105,
+            1.106,
+            1.107,
+            1.108,
+            1.109,
+            1.11,
+            1.111,
+            1.112,
+            1.113,
+            1.114,
+            1.115,
+            1.116,
+            1.117,
+            1.118,
+            1.119,
+            1.12,
+            1.121,
+            1.1219999999999999,
+            1.123,
+            1.124,
+            1.125,
+            1.126,
+            1.127,
+            1.1280000000000001,
+            1.129,
+            1.13,
+            1.131,
+            1.1320000000000001,
+            1.133,
+            1.134,
+            1.135,
+            1.1360000000000001,
+            1.137,
+            1.138,
+            1.139,
+            1.1400000000000001,
+            1.141,
+            1.142,
+            1.143,
+            1.1440000000000001,
+            1.145,
+            1.146,
+            1.147,
+            1.148,
+            1.149,
+            1.15,
+            1.151,
+            1.152,
+            1.153,
+            1.154,
+            1.155,
+            1.156,
+            1.157,
+            1.158,
+            1.159,
+            1.16,
+            1.161,
+            1.162,
+            1.163,
+            1.164,
+            1.165,
+            1.166,
+            1.167,
+            1.168,
+            1.169,
+            1.17,
+            1.171,
+            1.172,
+            1.173,
+            1.174,
+            1.175,
+            1.176,
+            1.177,
+            1.178,
+            1.179,
+            1.18,
+            1.181,
+            1.182,
+            1.183,
+            1.184,
+            1.185,
+            1.186,
+            1.187,
+            1.188,
+            1.189,
+            1.19,
+            1.191,
+            1.192,
+            1.193,
+            1.194,
+            1.195,
+            1.196,
+            1.197,
+            1.198,
+            1.199,
+            1.2,
+            1.201,
+            1.202,
+            1.203,
+            1.204,
+            1.205,
+            1.206,
+            1.207,
+            1.208,
+            1.209,
+            1.21,
+            1.211,
+            1.212,
+            1.213,
+            1.214,
+            1.215,
+            1.216,
+            1.217,
+            1.218,
+            1.219,
+            1.22,
+            1.221,
+            1.222,
+            1.223,
+            1.224,
+            1.225,
+            1.226,
+            1.227,
+            1.228,
+            1.229,
+            1.23,
+            1.231,
+            1.232,
+            1.233,
+            1.234,
+            1.235,
+            1.236,
+            1.237,
+            1.238,
+            1.239,
+            1.24,
+            1.241,
+            1.242,
+            1.2429999999999999,
+            1.244,
+            1.245,
+            1.246,
+            1.2469999999999999,
+            1.248,
+            1.249,
+            1.25,
+            1.251,
+            1.252,
+            1.2530000000000001,
+            1.254,
+            1.255,
+            1.256,
+            1.2570000000000001,
+            1.258,
+            1.259,
+            1.26,
+            1.2610000000000001,
+            1.262,
+            1.263,
+            1.264,
+            1.2650000000000001,
+            1.266,
+            1.267,
+            1.268,
+            1.2690000000000001,
+            1.27,
+            1.271,
+            1.272,
+            1.2730000000000001,
+            1.274,
+            1.275,
+            1.276,
+            1.2770000000000001,
+            1.278,
+            1.279,
+            1.28,
+            1.2810000000000001,
+            1.282,
+            1.283,
+            1.284,
+            1.2850000000000001,
+            1.286,
+            1.287,
+            1.288,
+            1.289,
+            1.29,
+            1.291,
+            1.292,
+            1.293,
+            1.294,
+            1.295,
+            1.296,
+            1.297,
+            1.298,
+            1.299
+          ]
+        ],
+        "kwargs": {
+          "window": 250
+        },
+        "extract": {
+          "samples": "samples",
+          "win_rate": "win_rate"
+        }
+      },
+      "expected": {
+        "samples": 50,
+        "win_rate": 1.0
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-60",
+      "tier": 2,
+      "name": "费用率（半年 → 年化）",
+      "source": "M310",
+      "module": "metrics",
+      "call": {
+        "fn": "fee_ratio",
+        "args": [
+          7000000,
+          1000000000,
+          182.5
+        ],
+        "kwargs": {},
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": 0.014
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-61",
+      "tier": 2,
+      "name": "换手率：全切换 = 1.0",
+      "source": "式(3.6)",
+      "module": "metrics",
+      "call": {
+        "fn": "turnover_from_weights",
+        "args": [
+          {
+            "A": 1.0,
+            "B": 0.0
+          },
+          {
+            "A": 0.0,
+            "B": 1.0
+          },
+          {
+            "A": 0.0,
+            "B": 0.0
+          },
+          0.0
+        ],
+        "kwargs": {},
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": 1.0
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-62",
+      "tier": 2,
+      "name": "披露换手率：取买卖较低者",
+      "source": "§3.3 披露口径",
+      "module": "metrics",
+      "call": {
+        "fn": "turnover_disclosed",
+        "args": [
+          120,
+          80,
+          200
+        ],
+        "kwargs": {},
+        "extract": {
+          "value": "__self__"
+        }
+      },
+      "expected": {
+        "value": 0.4
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-63",
+      "tier": 2,
+      "name": "对账步1：份额×净值达标",
+      "source": "附件A §8.2 步1 / T-3",
+      "module": "reconcile",
+      "call": {
+        "fn": "step1_share_nav_identity",
+        "args": [
+          1000000,
+          1.0,
+          1000050
+        ],
+        "kwargs": {},
+        "extract": {
+          "level": "level",
+          "step": "step"
+        }
+      },
+      "expected": {
+        "level": "PASS",
+        "step": 1
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-64",
+      "tier": 2,
+      "name": "对账步1：偏差 3% 应 BLOCK",
+      "source": "附件A §8.3 判级",
+      "module": "reconcile",
+      "call": {
+        "fn": "step1_share_nav_identity",
+        "args": [
+          1000000,
+          1.0,
+          970000
+        ],
+        "kwargs": {},
+        "extract": {
+          "level": "level"
+        }
+      },
+      "expected": {
+        "level": "BLOCK"
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-65",
+      "tier": 2,
+      "name": "对账步2：红利再投缺失应被发现",
+      "source": "式(1.4)/陷阱 T1",
+      "module": "reconcile",
+      "call": {
+        "fn": "step2_share_continuity",
+        "args": [],
+        "kwargs": {
+          "s_end_wan": 1100000,
+          "s_prev_wan": 1000000,
+          "net_sub_shares_wan": 0,
+          "div_reinvest_wan": 0
+        },
+        "extract": {
+          "level": "level",
+          "residual_in_detail": "detail"
+        }
+      },
+      "expected": {
+        "level": "BLOCK",
+        "residual_in_detail": "resid 100000.0000 万份（相对 10.0000%）"
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-66",
+      "tier": 2,
+      "name": "对账步5：年 ±2% 容差",
+      "source": "附件C T-4",
+      "module": "reconcile",
+      "call": {
+        "fn": "step5_mgmt_fee",
+        "args": [
+          1025,
+          1000
+        ],
+        "kwargs": {
+          "period": "year"
+        },
+        "extract": {
+          "level": "level"
+        }
+      },
+      "expected": {
+        "level": "WARN"
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    },
+    {
+      "id": "GV-67",
+      "tier": 2,
+      "name": "对账步3：无公告 → SKIP 非 PASS",
+      "source": "附件A §8.2 步3",
+      "module": "reconcile",
+      "call": {
+        "fn": "step3_dividend_amount",
+        "args": [
+          18730,
+          null
+        ],
+        "kwargs": {},
+        "extract": {
+          "level": "level"
+        }
+      },
+      "expected": {
+        "level": "SKIP"
+      },
+      "notes": "通用调用规格生成（Tier-2 回归基线，非独立真值）"
+    }
+  ]
+}
