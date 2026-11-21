@@ -58,6 +58,51 @@
 
 ---
 
+## [1.0.0rc2] - 2026-11-21
+
+### Fixed —— 《裁定书四》4 条 P0（M1 复跑不放行）
+
+**P0-1 `waterfall()` 的 `passed` 语义（最严重）**
+
+自证指纹（`R_net` 由 A 式反解）下残差按定义恒为 0，原实现仍返回 `passed=True`
+只发 warning —— 下游只要读布尔值或过滤 warning，就等于没有门。
+
+- 自证指纹 → `passed=False`、`gate_status="self_provision"`
+- 残差超阈 → `passed=False`、`gate_status="residual_exceeded"`
+- 新增 `gate_ok` 属性与 `require_pass()`（未通过即抛 `AttributionResidualError`）
+- 新增 `r_net_source` 参数（`identity`/`return`/`disclosure`/`unknown`）：
+  显式声明避免「独立路径恰好完美闭合」被误判为自证（假阳性）
+- `waterfall_independent` 显式声明 `r_net_source="return"`
+
+**P0-2 恒真断言**
+
+`test_identity_a_closes` 用 `r_net_from_identity` 反解 R_net 再喂回
+`check_identity_a`，残差按定义恒为 0，断言无论如何都通过。
+
+- 改名 `test_identity_a_residual_is_actually_checked`
+- 改为：独立路径构造 R_net（真实 58.34% 收益率）断言通过 + A_T+1% 断言变红
+- 负控实测：一致数据 `residual_pct=0.000000% passed=True`；
+  A_T+1% `residual_pct=0.990099% passed=False`
+
+**P0-3 打包与 CI**
+
+- `contracts/{build_golden_vectors.py, golden_vectors.json}` 移入本仓库
+- `check_vectors.py` / `test_contract.py` 路径改为仓库内
+- 新增 `.github/workflows/ci.yml`：pytest + check_vectors + check_coverage
+  + secret 扫描 + **clean-clone 一条命令全绿**
+- 实测：`git archive` 导出干净快照 → 301 passed / 67-67 / coverage PASS
+
+**P0-4 DEV-001/008/009 状态闭环**
+
+三者在 DEVIATIONS.md 中由「待裁定」改为「已裁定（裁定书三，A 方案）· 已闭环」，
+并附回写位置与衡鉴复跑结论。
+
+### 测试
+
+301 项全绿（+3），覆盖率 92.06%，黄金向量 67/67。
+
+---
+
 ## [Unreleased]
 
 ### Planned（M1 · 目标 v1.0.0）

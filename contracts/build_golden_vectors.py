@@ -26,7 +26,8 @@ from decimal import Decimal
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-CORE_SRC = HERE.parent / "gwfund-core" / "src"
+# contracts/ 现位于 gwfund-core 仓库内部（《裁定书四》P0-3），源码在同级 src/
+CORE_SRC = HERE.parent / "src"
 sys.path.insert(0, str(CORE_SRC))
 
 from gwfund_core import attribution, chase, fees, identities, mixing, returns  # noqa: E402

@@ -1,7 +1,7 @@
 {
   "schema_version": "1.1.0",
   "generated_at": "2026-11-21T18:40:00+08:00",
-  "core_version": "1.0.0rc1",
+  "core_version": "1.0.0rc2",
   "spec_version": "附件A v1.1（含 SPEC-GAP-01~05）/ SOW v1.1",
   "tolerance": 1e-06,
   "purpose": "四端一致性对拍（SOW §7.3 C12 / 附件C §13）；差异 > tolerance 阻断 CI",
