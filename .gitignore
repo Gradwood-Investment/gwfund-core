@@ -1,0 +1,39 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# --- Test / tooling ---
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# --- 红线：本仓库绝不含任何数据、密钥、数据库文件（SOW §11.2.1）---
+*.parquet
+*.duckdb
+*.db
+*.sqlite
+*.sqlite3
+*.csv
+*.xlsx
+*.pkl
+data/
+.secrets
+.env
+.env.*
+*.key
+*.pem
+
+# --- 编辑器 ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
